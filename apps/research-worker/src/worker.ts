@@ -1,19 +1,11 @@
 import "dotenv/config";
 import { createHash, randomUUID } from "node:crypto";
-import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { promisify } from "node:util";
-import { join, resolve } from "node:path";
-import { tmpdir } from "node:os";
 import { Redis } from "ioredis";
-import OpenAI from "openai";
 import { getCollections, getMongoClient } from "@triviality/database";
 import { config } from "./config.js";
-import { spawnDevinResearchAgents } from "./devin.js";
+import { runSwarm } from "./swarm.js";
 
-const execFileAsync = promisify(execFile);
 const redis = new Redis(config.redisUrl, { maxRetriesPerRequest: null });
-const openai = config.openAiKey ? new OpenAI({ apiKey: config.openAiKey }) : null;
 
 type OpenAlexWork = {
   id: string;
@@ -89,7 +81,7 @@ async function fetchOpenAlex(query: string, perPage: number): Promise<OpenAlexWo
   url.searchParams.set("search", query.replace(/[?*]/g, " ").slice(0, 450));
   url.searchParams.set("sort", "relevance_score:desc");
   url.searchParams.set("per-page", String(perPage));
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw new Error(`OpenAlex request failed: ${response.status} ${response.statusText}`);
   const payload = await response.json() as { results?: OpenAlexWork[] };
   return (payload.results ?? []).filter((work) => work.title);
@@ -117,73 +109,6 @@ async function fetchLiterature(title: string, statement: string, area: string): 
   return [...hits.values()].slice(0, 24);
 }
 
-async function synthesizeHypotheses(title: string, statement: string, literature: OpenAlexWork[]) {
-  if (!openai) throw new Error("OPENAI_API_KEY is required for hypothesis generation");
-  const sources = literature.map((work, index) => `${index + 1}. ${work.title} (${work.publication_year ?? "n.d."})`).join("\n");
-  const response = await openai.chat.completions.create({
-    model: config.openAiModel,
-    temperature: 0.2,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: "You are a mathematical research director. Generate competing, falsifiable directions. Do not claim the target is solved. Return JSON only: {\"hypotheses\":[{\"title\":string,\"statement\":string,\"approach\":string,\"rationale\":string,\"plausibility\":number}]}" },
-      { role: "user", content: `Research space: ${title}\nExploration brief: ${statement}\nRelevant literature:\n${sources || "No sources were retrieved."}\nGenerate 2 to 4 materially different research ideas. Each must identify a mechanism and a concrete proof or counterexample direction.` },
-    ],
-  });
-  const content = response.choices[0]?.message.content ?? "{}";
-  const parsed = JSON.parse(content) as { hypotheses?: unknown[] };
-  const output = (parsed.hypotheses ?? []).filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object").slice(0, 4);
-  if (!output.length) throw new Error("The research model returned no hypotheses");
-  return output.map((item) => ({
-    title: String(item.title ?? "Untitled hypothesis"),
-    statement: String(item.statement ?? ""),
-    approach: String(item.approach ?? "Unspecified approach"),
-    rationale: String(item.rationale ?? "Model-generated research direction"),
-    plausibility: Math.max(0, Math.min(1, Number(item.plausibility ?? 0.5))),
-  })).filter((item) => item.statement.length > 0);
-}
-
-async function synthesizeProof(title: string, statement: string, hypothesis: string) {
-  if (!openai) throw new Error("OPENAI_API_KEY is required for proof artifact generation");
-  const response = await openai.chat.completions.create({
-    model: config.openAiModel,
-    temperature: 0,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: "You are a Lean 4 proof engineer. Produce a small faithful lemma related to the research target, not a fabricated proof of the full problem. Return JSON only: {\"theorem_name\":string,\"statement\":string,\"lean\":string,\"latex\":string}. The Lean file must import Mathlib, contain exactly one theorem, and use no sorry, axiom, unsafe, native_decide, or set_option." },
-      { role: "user", content: `Research target: ${title}\nProblem: ${statement}\nPromising direction: ${hypothesis}\nProduce the smallest meaningful formalizable lemma you can support. The checker will decide whether the code is valid.` },
-    ],
-  });
-  const content = response.choices[0]?.message.content ?? "{}";
-  const parsed = JSON.parse(content) as Record<string, unknown>;
-  const lean = String(parsed.lean ?? "");
-  if (!lean.includes("theorem") && !lean.includes("lemma")) throw new Error("The research model returned no Lean declaration");
-  return { theoremName: String(parsed.theorem_name ?? "research_lemma"), statement: String(parsed.statement ?? ""), lean, latex: String(parsed.latex ?? "") };
-}
-
-async function checkLean(source: string, theoremName: string): Promise<{ verified: boolean; checker: string; axioms: string[]; log: string }> {
-  const forbidden = [/\bsorry\b/, /^\s*axiom\b/m, /\bunsafe\b/, /native_decide/, /implemented_by/, /^\s*set_option\b/m];
-  const blocked = forbidden.find((pattern) => pattern.test(source));
-  if (blocked) return { verified: false, checker: `Rejected by static policy: ${blocked}`, axioms: [], log: "" };
-  const projectDir = resolve(config.leanProjectDir);
-  const checkDir = await mkdtemp(join(tmpdir(), "triviality-lean-"));
-  const checkFile = join(checkDir, "Check.lean");
-  await writeFile(checkFile, `${source.trim()}\n\n#print axioms ${theoremName}\n`, "utf8");
-  try {
-    const result = await execFileAsync("lake", ["env", "lean", checkFile], { cwd: projectDir, timeout: config.leanTimeoutMs, maxBuffer: 1024 * 1024 });
-    const log = `${result.stdout}\n${result.stderr}`;
-    const match = log.match(/depends on axioms: \[([^\]]*)\]/);
-    const axioms = match?.[1]?.split(",").map((item) => item.trim()).filter(Boolean) ?? [];
-    const allowed = new Set(["propext", "Classical.choice", "Quot.sound"]);
-    const disallowed = axioms.filter((axiom) => !allowed.has(axiom));
-    return { verified: disallowed.length === 0, checker: disallowed.length ? `Disallowed axioms: ${disallowed.join(", ")}` : "Lean 4 checker passed with no disallowed axioms", axioms, log };
-  } catch (error) {
-    const detail = error as { stdout?: string; stderr?: string; message?: string };
-    return { verified: false, checker: `Lean checker unavailable or rejected the artifact: ${detail.message ?? "unknown error"}`, axioms: [], log: `${detail.stdout ?? ""}\n${detail.stderr ?? ""}` };
-  } finally {
-    await rm(checkDir, { recursive: true, force: true });
-  }
-}
-
 async function runEpisode(episodeId: string): Promise<void> {
   const collections = await getCollections();
   const episode = await collections.researchEpisodes.findOne({ _id: episodeId });
@@ -192,7 +117,10 @@ async function runEpisode(episodeId: string): Promise<void> {
   try {
     await addGraphNode(episodeId, problem._id, "RESEARCH_PROBLEM", "Research space", `${episode.area ?? "Mathematics"} · ${episode.title}`, 50, 13, "active");
     await updateStage(episodeId, "Finding seed literature for the research space", 14);
-    const works = await fetchLiterature(episode.title, problem.statement, episode.area ?? "Mathematics");
+    const works = await fetchLiterature(episode.title, problem.statement, episode.area ?? "Mathematics").catch(async (error) => {
+      await emit(episodeId, "research.literature.unavailable", { message: "Literature lookup unavailable; continuing with explicitly uncited mathematical reasoning" });
+      return [] as LiteratureHit[];
+    });
     await emit(episodeId, "research.literature.expanded", {
       seedCount: works.filter((work) => work.discovery === "seed").length,
       expandedCount: works.filter((work) => work.discovery === "expanded").length,
@@ -214,57 +142,84 @@ async function runEpisode(episodeId: string): Promise<void> {
     }
     await emit(episodeId, "research.literature.completed", { count: works.length });
 
-    if (config.devinApiKey) {
-      await updateStage(episodeId, "Spawning Devin research agents", 30);
-      try {
-        await spawnDevinResearchAgents(episodeId, episode.title, problem.statement, works.map((work) => `${work.title ?? "Untitled"} (${work.publication_year ?? "n.d."})`));
-        await emit(episodeId, "research.devin.fanout.completed", { roles: 3 });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Devin fanout unavailable";
-        await emit(episodeId, "research.devin.unavailable", { error: message });
-        console.warn(`Devin fanout skipped for ${episodeId}: ${message}`);
+    {
+      await updateStage(episodeId, "Starting WorkSwarm research team", 30);
+      const phases: Record<string, number> = { Plan: 35, Investigate: 45, Critique: 60, Formalize: 75, Deliver: 95 };
+      const outcome = await runSwarm({
+        episode_id: episodeId, title: episode.title, statement: problem.statement,
+        lean_statement: episode.leanStatement ?? "", proof_attempts: Math.min(6, episode.budget ?? 2),
+        role_models: episode.roleModels,
+        literature: works.map((work) => ({ title: work.title, year: work.publication_year,
+          abstract: abstractFromIndex(work.abstract_inverted_index), url: work.primary_location?.landing_page_url ?? work.id })),
+      }, async (message) => {
+        await emit(episodeId, "research.swarm.event", message);
+        if (message.kind !== "progress") return;
+        const event = metadata(message.event);
+        if (event.kind === "phase") await updateStage(episodeId, `Research team: ${String(event.phase)}`, phases[String(event.phase)] ?? 40);
+        if (typeof event.agent_id === "string" && String(event.kind).startsWith("agent_")) {
+          const attemptId = `attempt_${createHash("sha256").update(`${episodeId}:${event.agent_id}`).digest("hex").slice(0, 24)}`;
+          const status = event.kind === "agent_started" ? "RUNNING" : event.kind === "agent_completed" ? "SUCCEEDED" : "FAILED";
+          const now = new Date();
+          await collections.researchAttempts.updateOne({ _id: attemptId }, {
+            $set: { status, updatedAt: now, proofState: String(event.outcome ?? event.message ?? "Working"),
+              ...(status !== "RUNNING" ? { completedAt: now } : {}) },
+            $setOnInsert: { episodeId, hypothesisId: "", strategy: `WorkSwarm · ${String(event.phase ?? "research")}`,
+              input: { role: event.label, model: event.model, prompt: event.prompt, framework: "WorkSwarm SwarmFlow" },
+              createdAt: now, startedAt: now },
+          }, { upsert: true });
+        }
+      });
+      const hypothesisIds: string[] = [];
+      for (const [index, report] of outcome.reports.entries()) {
+        if (!report) continue;
+        const hypothesisId = id("hypothesis");
+        hypothesisIds.push(hypothesisId);
+        const now = new Date();
+        await collections.researchHypotheses.insertOne({ _id: hypothesisId, episodeId, problemId: problem._id,
+          statement: report.evidence, rationale: report.approach, assumptions: report.risks,
+          expectedConsequences: { approach: report.approach, nextStep: report.next_step },
+          status: "PROMISING", createdAt: now, updatedAt: now });
+        await addGraphNode(episodeId, hypothesisId, "RESEARCH_HYPOTHESIS", `Researcher ${index + 1}`, report.approach, 30 + index * 40, 35, "candidate");
+        await addGraphEdge(episodeId, problem._id, hypothesisId, "PRODUCES", "investigates");
       }
-    }
-
-    await updateStage(episodeId, "Generating competing hypotheses", 45);
-    if (!config.openAiKey) throw new Error("OPENAI_API_KEY is not configured; literature was retrieved but synthesis cannot continue");
-    const hypotheses = await synthesizeHypotheses(episode.title, problem.statement, works);
-    const hypothesisIds: string[] = [];
-    for (let index = 0; index < hypotheses.length; index += 1) {
-      const hypothesis = hypotheses[index];
-      const hypothesisId = id("hypothesis");
-      hypothesisIds.push(hypothesisId);
+      let formalizationId: string | undefined;
+      if (outcome.proof) {
+        const proof = outcome.proof;
+        formalizationId = id("formalization");
+        const now = new Date();
+        await collections.formalizations.insertOne({ _id: formalizationId, episodeId, system: "Lean", systemVersion: "4 / Std",
+          verified: proof.verified, checker: proof.checker, axioms: proof.axioms, verificationLog: proof.log,
+          theoremName: proof.theoremName, statement: proof.statement, leanSource: proof.lean,
+          createdAt: now, updatedAt: now });
+        await addGraphNode(episodeId, formalizationId, "FORMALIZATION", "Fixed theorem", proof.checker, 50, 65, proof.verified ? "verified" : "candidate");
+        for (const hypothesisId of hypothesisIds) await addGraphEdge(episodeId, hypothesisId, formalizationId, "SUPPORTS", "reviewed evidence");
+      }
+      const targetVerified = outcome.status === "verified" && !!episode.leanStatement && outcome.proof?.verified === true;
       const now = new Date();
-      await collections.researchHypotheses.insertOne({ _id: hypothesisId, episodeId, problemId: problem._id, statement: hypothesis.statement, rationale: hypothesis.title, assumptions: "", expectedConsequences: { approach: hypothesis.approach, rationale: hypothesis.rationale }, noveltyEstimate: 0.5, plausibilityEstimate: hypothesis.plausibility, formalizability: 0.6, status: "PROMISING", createdAt: now, updatedAt: now });
-      await addGraphNode(episodeId, hypothesisId, "RESEARCH_HYPOTHESIS", `H${index + 1} · ${hypothesis.title}`, hypothesis.approach, 22 + index * 25, 35, "active");
-      await addGraphEdge(episodeId, problem._id, hypothesisId, "PRODUCES", "explores");
-      if (paperIds[index]) await addGraphEdge(episodeId, hypothesisId, paperIds[index], "USES", "informed by");
+      const resultId = id("result");
+      await collections.researchResults.insertOne({ _id: resultId, episodeId,
+        title: targetVerified ? "Verified formal target" : outcome.status === "formalized" ? "Checked formalization — target review required" : "Research findings",
+        summary: outcome.summary, status: targetVerified ? "VERIFIED" : "CANDIDATE",
+        evidence: { formalizationId, framework: "WorkSwarm SwarmFlow", targetOrigin: outcome.target_origin, outcome },
+        createdAt: now, updatedAt: now });
+      await addGraphNode(episodeId, resultId, "RESEARCH_RESULT", "Team result", outcome.summary, 50, 87, targetVerified ? "verified" : "candidate");
+      if (formalizationId) await addGraphEdge(episodeId, formalizationId, resultId, "PRODUCES", "checked outcome");
+      await collections.researchEpisodes.updateOne({ _id: episodeId }, { $set: {
+        status: targetVerified ? "VERIFIED" : "PROMISING", stage: outcome.status === "blocked" ? "Research team blocked" : "Research team complete",
+        summary: outcome.summary, progress: 100, completedAt: now, updatedAt: now,
+      } });
+      await emit(episodeId, "research.job.completed", { verified: targetVerified, outcome: outcome.status });
+      return;
     }
 
-    const attemptId = id("attempt");
-    await collections.researchAttempts.insertOne({ _id: attemptId, episodeId, hypothesisId: hypothesisIds[0] ?? "", strategy: "diverse hypothesis portfolio", status: "SUCCEEDED", input: { role: "hypothesis_generator", mode: episode.mode }, proofState: `${hypotheses.length} competing hypotheses retained`, createdAt: new Date(), updatedAt: new Date(), startedAt: new Date(), completedAt: new Date() });
-    await emit(episodeId, "research.hypotheses.completed", { count: hypotheses.length });
-
-    await updateStage(episodeId, "Formalizing the strongest smaller claim", 72);
-    const proofArtifact = await synthesizeProof(episode.title, problem.statement, hypotheses[0]?.statement ?? "");
-    const leanCheck = await checkLean(proofArtifact.lean, proofArtifact.theoremName);
-    const formalizationId = id("formalization");
-    await collections.formalizations.insertOne({ _id: formalizationId, episodeId, attemptId, system: "Lean", systemVersion: "4 + Mathlib", verified: leanCheck.verified, verificationLog: leanCheck.log.slice(-12000), theoremName: proofArtifact.theoremName, statement: proofArtifact.statement, leanSource: proofArtifact.lean, latexSource: proofArtifact.latex, checker: leanCheck.checker, axioms: leanCheck.axioms, createdAt: new Date(), updatedAt: new Date() });
-    const lemmaId = id("lemma");
-    await collections.lemmas.insertOne({ _id: lemmaId, name: proofArtifact.theoremName, statement: proofArtifact.statement, createdAt: new Date(), updatedAt: new Date() });
-    await addGraphNode(episodeId, lemmaId, "LEMMA", "Bridge lemma", proofArtifact.theoremName, 75, 63, leanCheck.verified ? "verified" : "candidate");
-    await addGraphEdge(episodeId, hypothesisIds[0] ?? problem._id, lemmaId, "DEPENDS_ON", "formalized as");
-    await emit(episodeId, "research.formalization.completed", { verified: leanCheck.verified, checker: leanCheck.checker });
-
-    const resultId = id("result");
-    await collections.researchResults.insertOne({ _id: resultId, episodeId, hypothesisId: hypothesisIds[0], attemptId, title: leanCheck.verified ? "Verified supporting lemma" : "Formalization candidate", summary: leanCheck.verified ? "The strongest smaller claim compiled in the independent Lean checker." : "The worker produced a candidate artifact, but independent verification did not certify it.", status: leanCheck.verified ? "VERIFIED" : "CANDIDATE", evidence: { formalizationId, checker: leanCheck.checker }, createdAt: new Date(), updatedAt: new Date() });
-    await addGraphNode(episodeId, resultId, "RESEARCH_RESULT", "Research result", leanCheck.verified ? "Lean verified" : "Candidate result", 45, 86, leanCheck.verified ? "verified" : "candidate");
-    await addGraphEdge(episodeId, lemmaId, resultId, "PRODUCES", "supports");
-
-    await collections.researchEpisodes.updateOne({ _id: episodeId }, { $set: { status: leanCheck.verified ? "VERIFIED" : "PROMISING", stage: "Research episode complete", progress: 100, summary: `${works.length} literature sources, ${hypotheses.length} competing hypotheses, and one formal artifact were recorded.`, completedAt: new Date(), updatedAt: new Date() } });
-    await emit(episodeId, "research.job.completed", { verified: leanCheck.verified });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Research worker failed";
+    {
+      await collections.researchAttempts.updateMany({ episodeId, status: "RUNNING" }, { $set: {
+        status: "FAILED", error: message, proofState: "Research team stopped before this agent completed.",
+        completedAt: new Date(), updatedAt: new Date(),
+      } });
+    }
     await collections.researchEpisodes.updateOne({ _id: episodeId }, { $set: { status: "ABANDONED", stage: "Research worker blocked", error: message, updatedAt: new Date() } });
     await emit(episodeId, "research.job.failed", { error: message });
     console.error(`Research episode ${episodeId} failed:`, error);

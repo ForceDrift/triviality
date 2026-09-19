@@ -1,5 +1,14 @@
 # Triviality
 
+## WorkSwarm research team
+
+The **WorkSwarm** orchestration layer runs a reusable Swarm Skill with parallel
+investigations, shared findings, independent critique, adaptive revision, and
+Lean proof repair. See [setup, demo, and challenge mapping](docs/openjiuwen-challenge.md).
+The skill lives in [swarm-skills/math-research](swarm-skills/math-research/SKILL.md).
+After setup, `pnpm swarm:demo` runs a live terminal demo and `pnpm swarm:test`
+runs deterministic collaboration tests with real Lean checks when installed.
+
 ## Data layer
 
 The research schema is MongoDB-native. `packages/database` defines typed collections for research state, mathematical knowledge, graph nodes and relationships, raw object-storage artifacts, and paper embeddings. MongoDB Atlas Vector Search indexes `paper_embeddings.embedding`; Redis tracks ingestion jobs.
@@ -26,9 +35,9 @@ The default discovery catalog covers 16 areas and requests up to 100 works per a
 The research workspace is backed by two additional apps:
 
 - `apps/research-api` — creates research episodes, stores their state in MongoDB, and enqueues work in Redis.
-- `apps/research-worker` — retrieves OpenAlex literature, asks OpenAI for competing hypotheses and a small formalization target, runs the Lean checker when `lake` is installed, and writes graph nodes, attempts, results, and artifacts back to MongoDB.
+- `apps/research-worker` — retrieves OpenAlex literature, runs the openJiuwen SwarmFlow research team with per-role models and independent Lean checks, and writes graph nodes, attempts, results, and artifacts back to MongoDB.
 
-When `DEVIN_API_KEY` is configured, the worker also fans each episode out to three server-side Devin sessions: a literature scout, a cross-domain researcher, and a formal proof critic. The service credential is never sent to the browser. Devin session IDs, reports, terminal states, timeouts, and failures are stored as research attempts. `cog_` credentials use the v3 API; set `DEVIN_ORG_ID` when automatic organization discovery is not permitted.
+WorkSwarm orchestrates every research episode. Choose a model or Devin agent for each role in the dashboard. Credentials stay server-side; see [provider setup and challenge notes](docs/openjiuwen-challenge.md). Devin runs only when assigned to a role, and its structured findings feed the shared workflow.
 
 Run the services in separate terminals:
 
@@ -40,4 +49,4 @@ pnpm research:worker
 pnpm --filter web dev
 ```
 
-The web app proxies `/api/research/*` to `RESEARCH_API_URL` (default `http://localhost:3010`). A research job is not considered verified because a model says it is: when Lean is unavailable or rejects the generated file, the episode remains a candidate/blocked result and the checker detail is shown in the episode page. To enable independent verification, install `elan`/Lean and point `LEAN_PROJECT_DIR` at the checked Lean project under `external/norththehackers/lean`.
+The web app proxies `/api/research/*` to `RESEARCH_API_URL` (default `http://localhost:3010`). A research job is not considered verified because a model says it is: when Lean is unavailable or rejects the generated file, the episode remains a candidate/blocked result and the checker detail is shown in the episode page. To enable independent verification, install Lean 4.19.0 and set `SWARM_LEAN_BIN` as described in the challenge notes.
