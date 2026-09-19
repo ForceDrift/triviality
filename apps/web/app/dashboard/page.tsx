@@ -151,7 +151,7 @@ function ResearchDeployModal({
         <div className="flex items-start justify-between border-b border-black/10 px-5 py-4 sm:px-6">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-black/45">Research</p>
-            <h2 className="mt-1.5 text-xl font-semibold tracking-[-0.05em]" id="deploy-research-title">Deploy research</h2>
+            <h2 className="mt-1.5 text-xl font-semibold tracking-[-0.05em]" id="deploy-research-title">Explore a research space</h2>
           </div>
           <button aria-label="Close deploy research dialog" className="rounded-md p-1.5 text-black/45 transition hover:bg-black/5 hover:text-black" onClick={onClose} type="button"><IconX size={18} /></button>
         </div>
@@ -190,8 +190,8 @@ function ResearchDeployModal({
 
           <section className="grid gap-4 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_15rem]">
             <div className="grid gap-4">
-              <label className="grid gap-1.5 text-sm font-medium">Research name<input required className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm font-normal outline-none transition focus:border-black/45" placeholder="e.g. A compactness principle for finite graphs" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></label>
-              <label className="grid gap-1.5 text-sm font-medium">Research problem<textarea required className="min-h-24 resize-y rounded-md border border-black/12 bg-white px-3.5 py-2.5 text-sm font-normal leading-6 outline-none transition focus:border-black/45" placeholder="What should the research system investigate?" value={form.statement} onChange={(event) => setForm((current) => ({ ...current, statement: event.target.value }))} /></label>
+              <label className="grid gap-1.5 text-sm font-medium">Research space name<input required className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm font-normal outline-none transition focus:border-black/45" placeholder="e.g. Compactness methods in finite graph theory" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></label>
+              <label className="grid gap-1.5 text-sm font-medium">Research space<textarea required className="min-h-24 resize-y rounded-md border border-black/12 bg-white px-3.5 py-2.5 text-sm font-normal leading-6 outline-none transition focus:border-black/45" placeholder="Describe the mathematical space agents should explore and connect." value={form.statement} onChange={(event) => setForm((current) => ({ ...current, statement: event.target.value }))} /><span className="text-xs font-normal leading-5 text-black/45">Agents will scan the space, generate competing ideas, and test promising directions.</span></label>
             </div>
             <div className="grid content-start gap-4">
               <FieldSelect label="Model provider" value={form.provider} onChange={(value) => setForm((current) => ({ ...current, provider: value as ResearchProvider }))} options={providers.map((provider) => provider.id)} displayOptions={providers.map((provider) => ({ value: provider.id, label: provider.name }))} />
@@ -203,10 +203,10 @@ function ResearchDeployModal({
         </div>
 
         <div className="flex flex-col gap-3 border-t border-black/10 bg-white px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <p className="text-xs text-black/45">Selected provider: <span className="font-medium text-black/70">{selectedProvider.name}</span></p>
+          <p className="text-xs text-black/45">{selectedProvider.name} will explore the space and generate ideas.</p>
           <div className="flex justify-end gap-3">
             <button className="h-10 rounded-md border border-black/12 px-4 text-sm font-medium transition hover:bg-black/5" onClick={onClose} type="button">Cancel</button>
-            <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-black px-5 text-sm font-medium text-white transition hover:bg-black/75 disabled:cursor-wait disabled:opacity-50" disabled={creating} type="submit"><IconPlus size={16} />{creating ? "Deploying research" : "Deploy research"}</button>
+            <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-black px-5 text-sm font-medium text-white transition hover:bg-black/75 disabled:cursor-wait disabled:opacity-50" disabled={creating} type="submit"><IconPlus size={16} />{creating ? "Starting exploration" : "Start exploration"}</button>
           </div>
         </div>
       </motion.form>
