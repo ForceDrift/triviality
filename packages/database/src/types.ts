@@ -73,6 +73,7 @@ export interface FormalizationDocument extends BaseDocument {
   statement?: string;
   leanSource?: string;
   latexSource?: string;
+  explanation?: string;
   checker?: string;
   axioms?: string[];
 }

@@ -1,76 +1,36 @@
 "use client";
 
-import type { ResearchJob, ResearchNode, ResearchNodeType } from "@/lib/research-store";
+import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import type { ResearchJob, ResearchNodeType } from "@/lib/research-store";
 
-const nodeStyles: Record<ResearchNodeType, { dot: string; badge: string }> = {
-  problem: { dot: "bg-black", badge: "bg-black text-white" },
-  hypothesis: { dot: "bg-white", badge: "bg-white text-black border border-black/15" },
-  paper: { dot: "bg-[#d8d8d8]", badge: "bg-[#f2f2f2] text-black/65" },
-  lemma: { dot: "bg-white ring-2 ring-black/60", badge: "bg-white text-black border border-black/25" },
-  proof: { dot: "bg-black", badge: "bg-black text-white" },
-  formalization: { dot: "bg-black", badge: "bg-black text-white" },
-  result: { dot: "bg-white ring-2 ring-black/30", badge: "bg-white text-black/70 border border-black/15" },
-};
-
-function nodeAt(job: ResearchJob, id: string): ResearchNode | undefined {
-  return job.nodes.find((node) => node.id === id);
-}
+const stages: { label: string; types: ResearchNodeType[] }[] = [
+  { label: "Question", types: ["problem"] },
+  { label: "Investigations", types: ["hypothesis", "lemma"] },
+  { label: "Proof & outcome", types: ["proof", "formalization", "result"] },
+];
 
 export function ResearchGraph({ job, compact = false }: { job: ResearchJob; compact?: boolean }) {
-  const markerId = `research-arrow-${job.id.replace(/[^a-z0-9]/gi, "")}`;
-
-  return (
-    <div className={`relative overflow-hidden rounded-2xl border border-black/10 bg-[#fafafa] ${compact ? "min-h-[360px]" : "min-h-[520px]"}`}>
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.035)_1px,transparent_1px)] bg-[size:32px_32px]" />
-      <div className="relative z-10 flex items-center justify-end border-b border-black/10 px-5 py-3 text-xs text-black/45">
-        <span>{job.nodes.length} nodes · {job.edges.length} relations</span>
-      </div>
-
-      <div className="relative min-h-[460px]">
-        <svg aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full" preserveAspectRatio="none" viewBox="0 0 100 100">
-          <defs>
-            <marker id={markerId} markerHeight="5" markerWidth="5" orient="auto" refX="4" refY="2.5" viewBox="0 0 5 5">
-              <path d="M0,0 L5,2.5 L0,5" fill="none" stroke="currentColor" strokeWidth="1" />
-            </marker>
-          </defs>
-          {job.edges.map((edge) => {
-            const source = nodeAt(job, edge.source);
-            const target = nodeAt(job, edge.target);
-            if (!source || !target) return null;
-            const bend = Math.abs(source.x - target.x) > 30 ? 2 : 0;
-            return (
-              <path
-                key={`${edge.source}-${edge.target}`}
-                d={`M ${source.x} ${source.y} Q ${(source.x + target.x) / 2} ${((source.y + target.y) / 2) - bend} ${target.x} ${target.y}`}
-                fill="none"
-                markerEnd={`url(#${markerId})`}
-                stroke="currentColor"
-                strokeOpacity="0.22"
-                strokeWidth="0.45"
-              />
-            );
-          })}
-        </svg>
-
-        {job.nodes.map((node) => {
-          const style = nodeStyles[node.type];
-          return (
-            <div
-              key={node.id}
-              className="absolute w-[8.4rem] -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${node.x}%`, top: `${node.y}%` }}
-            >
-              <div className={`rounded-xl border border-black/10 px-3 py-2.5 shadow-[0_10px_28px_rgba(0,0,0,0.07)] ${style.badge}`}>
-                <div className="flex items-center gap-2">
-                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${style.dot}`} />
-                  <span className="truncate font-mono text-[9px] font-semibold uppercase tracking-[0.08em]">{node.label}</span>
-                </div>
-                <p className="mt-1 truncate text-[9px] opacity-55">{node.detail}</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+  const [selected, setSelected] = useState<string | null>(null);
+  const nodes = job.nodes.filter((node) => node.type !== "paper");
+  const relations = job.edges.filter((edge) => (edge.source === selected || edge.target === selected) && nodes.some((node) => node.id === edge.source) && nodes.some((node) => node.id === edge.target));
+  return <section className="overflow-hidden rounded-2xl border border-black/10 bg-white">
+    <div className="border-b border-black/10 px-5 py-4">
+      <h2 className="text-sm font-semibold">Research graph</h2>
+      <p className="mt-1 text-xs leading-5 text-black/50">Select a card for its full findings and relationships. Papers remain in the Literature tab.</p>
     </div>
-  );
+    <div className={`grid gap-5 p-5 ${compact ? "" : "xl:grid-cols-3"}`}>
+      {stages.map((stage, index) => <div key={stage.label} className="min-w-0">
+        <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-black/45">0{index + 1} / {stage.label}</h3>
+        <div className="space-y-3">{nodes.filter((node) => stage.types.includes(node.type)).map((node) => <button key={node.id} type="button" aria-pressed={selected === node.id} onClick={() => setSelected(selected === node.id ? null : node.id)} className={`w-full rounded-xl border p-4 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 ${selected === node.id ? "border-black bg-black text-white" : "border-black/10 bg-[#fafafa] hover:border-black/40"}`}>
+          <span className="block text-sm font-semibold break-words">{node.label}</span>
+          <span className="mt-2 block whitespace-pre-wrap text-xs leading-6 opacity-65 [overflow-wrap:anywhere]">{node.detail.split(/\n\s*\n|(?<=\.)\s/)[0]}</span>
+          <span className="mt-3 block text-[9px] uppercase tracking-widest opacity-50">{node.type} · {node.status}</span>
+        </button>)}</div>
+      </div>)}
+    </div>
+    {selected && <div className="border-t border-black/10 bg-[#fafafa] p-5" aria-live="polite"><div className="mb-5 space-y-3 text-sm leading-7 [overflow-wrap:anywhere]"><ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{nodes.find((node) => node.id === selected)?.detail ?? ""}</ReactMarkdown></div><h3 className="text-xs font-semibold">Recorded relationships</h3>{relations.length ? <ul className="mt-3 space-y-2 text-xs leading-6 text-black/65">{relations.map((edge, index) => <li key={index}><strong>{nodes.find((node) => node.id === edge.source)?.label}</strong> → <span>{edge.label || "related to"}</span> → <strong>{nodes.find((node) => node.id === edge.target)?.label}</strong></li>)}</ul> : <p className="mt-2 text-xs text-black/50">No relationships recorded for this card.</p>}</div>}
+  </section>;
 }
