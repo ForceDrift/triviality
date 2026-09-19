@@ -1,4 +1,4 @@
-export type ResearchStatus = "UNEXPLORED" | "ACTIVE" | "PROMISING" | "FORMALIZING" | "VERIFIED" | "DISPROVED" | "ABANDONED";
+export type ResearchStatus = "UNEXPLORED" | "ACTIVE" | "PROMISING" | "FORMALIZING" | "VERIFIED" | "DISPROVED" | "ABANDONED" | "CANCELLED";
 export type AttemptStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 export type ResultStatus = "CANDIDATE" | "VERIFIED" | "DISPROVED" | "PUBLISHED";
 
@@ -48,7 +48,7 @@ export interface ResearchResultDocument extends BaseDocument { episodeId: string
 export interface PaperDocument extends BaseDocument { externalId: string; title: string; abstract?: string; doi?: string; authors?: string[]; subjects: string[]; publishedAt?: Date; citedByCount: number; relevanceScore?: number; landingUrl?: string; openAccessUrl?: string; rawMetadata?: unknown; }
 export interface ResearchEpisodePaperDocument extends BaseDocument { episodeId: string; paperId: string; source: string; relevance: string; rank: number; }
 export interface TheoremDocument extends BaseDocument { paperId?: string; name: string; statement: string; assumptions?: unknown; }
-export interface LemmaDocument extends BaseDocument { paperId?: string; name: string; statement: string; assumptions?: unknown; }
+export interface LemmaDocument extends BaseDocument { paperId?: string; episodeId?: string; name: string; statement: string; assumptions?: unknown; }
 export interface DefinitionDocument extends BaseDocument { paperId?: string; name: string; statement: string; }
 export interface ConjectureDocument extends BaseDocument { paperId?: string; name: string; statement: string; status: ResearchStatus; }
 export interface TechniqueDocument extends BaseDocument { name: string; description: string; }

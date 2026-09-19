@@ -28,7 +28,9 @@ The research workspace is backed by two additional apps:
 - `apps/research-api` — creates research episodes, stores their state in MongoDB, and enqueues work in Redis.
 - `apps/research-worker` — retrieves OpenAlex literature, asks OpenAI for competing hypotheses and a small formalization target, runs the Lean checker when `lake` is installed, and writes graph nodes, attempts, results, and artifacts back to MongoDB.
 
-When `DEVIN_API_KEY` is configured, the worker also fans each episode out to three server-side Devin sessions: a literature scout, a cross-domain researcher, and a formal proof critic. The service credential is never sent to the browser. Devin session IDs, reports, terminal states, timeouts, and failures are stored as research attempts. `cog_` credentials use the v3 API; set `DEVIN_ORG_ID` when automatic organization discovery is not permitted.
+Research jobs use an acknowledged Redis Stream consumer group. A job is acknowledged only after it completes, cancelled jobs are safely skipped, abandoned deliveries are reclaimed after `RESEARCH_JOB_CLAIM_IDLE_MS`, and failures retry up to `RESEARCH_JOB_MAX_ATTEMPTS` before moving to `triviality:research:jobs:dead`. `RESEARCH_WORKER_CONCURRENCY` controls the number of local consumers.
+
+When `DEVIN_API_KEY` is configured, the worker also fans each episode out to three server-side Devin sessions: a literature scout, a cross-domain researcher, and a formal proof critic. The worker waits for completed reports, records their provenance, and supplies successful reports as explicitly unverified context to both hypothesis synthesis and formalization; failed or timed-out reports are retained for diagnostics but excluded from synthesis. The service credential is never sent to the browser. Devin session IDs, reports, terminal states, timeouts, and failures are stored as research attempts. `cog_` credentials use the v3 API; set `DEVIN_ORG_ID` when automatic organization discovery is not permitted. Polling and the maximum wait are controlled by `DEVIN_POLL_INTERVAL_MS` and `DEVIN_TIMEOUT_MS`.
 
 Run the services in separate terminals:
 

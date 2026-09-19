@@ -7,7 +7,7 @@ import { IconArrowLeft, IconCheck, IconCode, IconFileDescription, IconLoader2 } 
 import { DashboardSidebar } from "../../dashboard-sidebar";
 import { DashboardTopbar } from "../../dashboard-topbar";
 import { ResearchGraph } from "@/components/research-graph";
-import { getResearchJob, type ResearchJob } from "@/lib/research-store";
+import { cancelResearchJob, getResearchJob, type ResearchJob } from "@/lib/research-store";
 
 type ArtifactTab = "literature" | "lean" | "latex";
 
@@ -16,6 +16,7 @@ export default function ResearchEpisodePage() {
   const [job, setJob] = useState<ResearchJob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<ArtifactTab>("literature");
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     const refresh = () => getResearchJob(params.jobId).then(setJob).catch((reason: Error) => setError(reason.message));
@@ -45,19 +46,23 @@ export default function ResearchEpisodePage() {
             <div className="w-full max-w-xs shrink-0"><div className="mb-2 flex justify-between text-[9px] font-semibold uppercase tracking-[0.18em] text-black/40"><span>{job.stage}</span><span>{job.progress}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-black/8"><div className="h-full rounded-full bg-black transition-all duration-500" style={{ width: `${job.progress}%` }} /></div></div>
           </div>
 
-          {job.status === "running" ? <RunningEpisode job={job} /> : job.status === "failed" ? <FailedEpisode job={job} /> : <CompletedEpisode job={job} tab={tab} setTab={setTab} />}
+          {job.status === "running" ? <RunningEpisode job={job} cancelling={cancelling} onCancel={() => { setCancelling(true); cancelResearchJob(job.id).then(setJob).catch((reason: Error) => setError(reason.message)).finally(() => setCancelling(false)); }} /> : job.status === "failed" ? <FailedEpisode job={job} /> : job.status === "cancelled" ? <CancelledEpisode /> : <CompletedEpisode job={job} tab={tab} setTab={setTab} />}
         </section>
       </div>
     </main>
   );
 }
 
-function RunningEpisode({ job }: { job: ResearchJob }) {
-  return <div className="mx-auto max-w-3xl py-24 text-center"><IconLoader2 className="mx-auto animate-spin text-black/45" size={28} /><p className="mt-6 text-2xl font-semibold tracking-[-0.05em]">The research director is working.</p><p className="mx-auto mt-3 max-w-md text-sm leading-6 text-black/50">Literature, hypotheses, counterexamples, and formal artifacts are being assembled into a resumable episode.</p><div className="mx-auto mt-10 grid max-w-xl gap-px overflow-hidden rounded-2xl border border-black/10 bg-black/10 text-left sm:grid-cols-3"><Stage active={job.progress >= 25} title="Literature" copy="Find structural neighbors" /><Stage active={job.progress >= 55} title="Frontier" copy="Keep competing ideas" /><Stage active={job.progress >= 88} title="Formalize" copy="Check the smallest claim" /></div></div>;
+function RunningEpisode({ job, cancelling, onCancel }: { job: ResearchJob; cancelling: boolean; onCancel: () => void }) {
+  return <div className="mx-auto max-w-3xl py-24 text-center"><IconLoader2 className="mx-auto animate-spin text-black/45" size={28} /><p className="mt-6 text-2xl font-semibold tracking-[-0.05em]">The research director is working.</p><p className="mx-auto mt-3 max-w-md text-sm leading-6 text-black/50">Literature, hypotheses, counterexamples, and formal artifacts are being assembled into a resumable episode.</p><div className="mx-auto mt-10 grid max-w-xl gap-px overflow-hidden rounded-2xl border border-black/10 bg-black/10 text-left sm:grid-cols-3"><Stage active={job.progress >= 25} title="Literature" copy="Find structural neighbors" /><Stage active={job.progress >= 55} title="Frontier" copy="Keep competing ideas" /><Stage active={job.progress >= 88} title="Formalize" copy="Check the smallest claim" /></div><button className="mt-8 rounded-full border border-black/15 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-black/55 transition hover:border-black/40 hover:text-black disabled:opacity-40" disabled={cancelling} onClick={onCancel} type="button">{cancelling ? "Cancelling" : "Cancel research"}</button></div>;
 }
 
 function FailedEpisode({ job }: { job: ResearchJob }) {
   return <div className="mx-auto max-w-2xl py-24 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-red-900/20 text-red-900">!</div><p className="mt-6 text-2xl font-semibold tracking-[-0.05em]">The worker could not complete this episode.</p><p className="mt-3 text-sm leading-6 text-black/50">No result was published as verified. The runtime recorded the failure so it can be fixed and replayed.</p><div className="mt-8 rounded-xl border border-red-900/15 bg-red-50 p-5 text-left text-sm leading-6 text-red-950">{job.error ?? job.stage}</div><Link className="mt-8 inline-flex rounded-full bg-black px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-white" href="/dashboard">Return to overview</Link></div>;
+}
+
+function CancelledEpisode() {
+  return <div className="mx-auto max-w-2xl py-24 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-black/15 text-black/50">×</div><p className="mt-6 text-2xl font-semibold tracking-[-0.05em]">This research episode was cancelled.</p><p className="mt-3 text-sm leading-6 text-black/50">The worker will acknowledge any queued delivery without publishing additional results.</p><Link className="mt-8 inline-flex rounded-full bg-black px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-white" href="/dashboard">Return to overview</Link></div>;
 }
 
 function Stage({ active, title, copy }: { active: boolean; title: string; copy: string }) {

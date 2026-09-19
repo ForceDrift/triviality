@@ -16,13 +16,15 @@ type CreateJobBody = {
 
 const app = Fastify({ logger: true });
 const redis = new Redis(config.redisUrl, { lazyConnect: true, maxRetriesPerRequest: 1 });
+const researchJobStream = "triviality:research:jobs:v2";
 
 function id(prefix: string): string {
   return `${prefix}_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
 }
 
-function publicStatus(status: string): "running" | "completed" | "failed" {
+function publicStatus(status: string): "running" | "completed" | "failed" | "cancelled" {
   if (status === "ACTIVE" || status === "UNEXPLORED") return "running";
+  if (status === "CANCELLED") return "cancelled";
   if (status === "ABANDONED" || status === "DISPROVED") return "failed";
   return "completed";
 }
@@ -168,7 +170,7 @@ app.post("/research/jobs", async (request: FastifyRequest<{ Body: CreateJobBody 
 
   try {
     if (redis.status === "wait") await redis.connect();
-    await redis.lpush("triviality:research:jobs", JSON.stringify({ episodeId }));
+    await redis.xadd(researchJobStream, "MAXLEN", "~", 10_000, "*", "episodeId", episodeId, "attempt", "0", "enqueuedAt", now.toISOString());
     await emit(episodeId, "research.job.created", { title, area: body.area ?? "Mathematics" });
   } catch (error) {
     await collections.researchEpisodes.updateOne({ _id: episodeId }, { $set: { status: "ABANDONED", stage: "Queue unavailable", error: error instanceof Error ? error.message : "Redis unavailable", updatedAt: new Date() } });
@@ -187,6 +189,21 @@ app.get("/research/jobs", async () => {
 app.get("/research/jobs/:jobId", async (request: FastifyRequest<{ Params: { jobId: string } }>, reply) => {
   const job = await serializeJob(request.params.jobId);
   return job ? job : reply.code(404).send({ error: "Research job not found" });
+});
+
+app.delete("/research/jobs/:jobId", async (request: FastifyRequest<{ Params: { jobId: string } }>, reply) => {
+  const collections = await getCollections();
+  const episode = await collections.researchEpisodes.findOne({ _id: request.params.jobId });
+  if (!episode) return reply.code(404).send({ error: "Research job not found" });
+  if (episode.status === "ACTIVE" || episode.status === "UNEXPLORED") {
+    const now = new Date();
+    const cancelled = await collections.researchEpisodes.updateOne(
+      { _id: episode._id, status: { $in: ["ACTIVE", "UNEXPLORED"] } },
+      { $set: { status: "CANCELLED", stage: "Cancelled by user", completedAt: now, updatedAt: now }, $unset: { error: "" } },
+    );
+    if (cancelled.modifiedCount) await emit(episode._id, "research.job.cancelled", {});
+  }
+  return serializeJob(episode._id);
 });
 
 app.get("/research/jobs/:jobId/events", async (request: FastifyRequest<{ Params: { jobId: string } }>) => {

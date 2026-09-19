@@ -1,4 +1,4 @@
-export type ResearchJobStatus = "running" | "completed" | "failed";
+export type ResearchJobStatus = "running" | "completed" | "failed" | "cancelled";
 export type ResearchProvider = "openai" | "devin" | "huawei";
 
 export type ResearchNodeType = "problem" | "hypothesis" | "paper" | "lemma" | "proof" | "result";
@@ -93,6 +93,10 @@ export function getResearchJobs(): Promise<ResearchJob[]> {
 
 export function getResearchJob(id: string): Promise<ResearchJob> {
   return request<ResearchJob>(`/${encodeURIComponent(id)}`);
+}
+
+export function cancelResearchJob(id: string): Promise<ResearchJob> {
+  return request<ResearchJob>(`/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export function createResearchJob(input: { title: string; statement: string; area: string; provider: ResearchProvider; mode: string; budget: number }): Promise<ResearchJob> {

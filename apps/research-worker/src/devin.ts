@@ -19,9 +19,15 @@ type DevinRole = {
   prompt: string;
 };
 
+export type DevinResearchReport = {
+  role: string;
+  strategy: string;
+  sessionId?: string;
+  status: "succeeded" | "failed" | "timed_out" | "cancelled";
+  report: string;
+};
+
 const terminalStatuses = new Set(["exit", "error", "suspended"]);
-const pollIntervalMs = 20_000;
-const maxPolls = 90;
 
 function id(prefix: string): string {
   return `${prefix}_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
@@ -114,36 +120,55 @@ async function emit(episodeId: string, type: string, payload: Record<string, unk
   await events.insertOne({ _id: id("event"), episodeId, type, payload, createdAt: new Date() });
 }
 
-async function monitorSession(organizationId: string, episodeId: string, attemptId: string, sessionId: string): Promise<void> {
-  for (let poll = 0; poll < maxPolls; poll += 1) {
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+async function monitorSession(organizationId: string, episodeId: string, attemptId: string, sessionId: string, role: DevinRole): Promise<DevinResearchReport> {
+  const deadline = Date.now() + config.devinTimeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, config.devinPollIntervalMs));
+    const collections = await getCollections();
+    const episode = await collections.researchEpisodes.findOne({ _id: episodeId }, { projection: { status: 1 } });
+    if (episode?.status === "CANCELLED") {
+      const report = "Local monitoring stopped because the research episode was cancelled.";
+      await recordAttempt(episodeId, attemptId, { status: "CANCELLED", error: report, proofState: report, completedAt: new Date() });
+      await emit(episodeId, "research.devin.cancelled", { attemptId, sessionId });
+      return { role: role.name, strategy: role.strategy, sessionId, status: "cancelled", report };
+    }
     const session = await getSession(organizationId, sessionId);
     if (!session || !terminalStatuses.has(session.status ?? "")) continue;
-    const report = await getMessages(organizationId, sessionId).catch((error) => `Unable to retrieve Devin report: ${error instanceof Error ? error.message : "unknown error"}`);
-    const succeeded = session.status === "exit";
+    let report = "";
+    let reportError: string | undefined;
+    try {
+      report = await getMessages(organizationId, sessionId);
+      if (!report.trim()) reportError = "Devin session completed without a report";
+    } catch (error) {
+      reportError = `Unable to retrieve Devin report: ${error instanceof Error ? error.message : "unknown error"}`;
+    }
+    const succeeded = session.status === "exit" && !reportError;
+    const detail = report || reportError || session.status_detail || `Devin session ended with status ${session.status}`;
     await recordAttempt(episodeId, attemptId, {
       status: succeeded ? "SUCCEEDED" : "FAILED",
-      proofState: report || session.status_detail || `Devin session ended with status ${session.status}`,
+      proofState: detail,
       completedAt: new Date(),
-      error: succeeded ? undefined : session.status_detail ?? `Devin session ended with status ${session.status}`,
+      error: succeeded ? undefined : reportError ?? session.status_detail ?? `Devin session ended with status ${session.status}`,
     });
     await emit(episodeId, "research.devin.completed", { attemptId, sessionId, status: session.status, succeeded });
-    return;
+    return { role: role.name, strategy: role.strategy, sessionId, status: succeeded ? "succeeded" : "failed", report: detail };
   }
 
-  await recordAttempt(episodeId, attemptId, { status: "FAILED", error: "Devin session monitoring timed out", proofState: "Devin session is still running after the local monitoring window.", completedAt: new Date() });
+  const report = "Devin session is still running after the local monitoring window.";
+  await recordAttempt(episodeId, attemptId, { status: "FAILED", error: "Devin session monitoring timed out", proofState: report, completedAt: new Date() });
   await emit(episodeId, "research.devin.timeout", { attemptId, sessionId });
+  return { role: role.name, strategy: role.strategy, sessionId, status: "timed_out", report };
 }
 
-export async function spawnDevinResearchAgents(episodeId: string, title: string, statement: string, literature: string[]): Promise<void> {
-  if (!config.devinApiKey) return;
+export async function spawnDevinResearchAgents(episodeId: string, title: string, statement: string, literature: string[]): Promise<DevinResearchReport[]> {
+  if (!config.devinApiKey) return [];
 
   const collections = await getCollections();
   const organizationId = await resolveOrganizationId();
   const researchRoles = roles(title, statement, literature, episodeId);
   const now = new Date();
 
-  await Promise.all(researchRoles.map(async (role) => {
+  return Promise.all(researchRoles.map(async (role): Promise<DevinResearchReport> => {
     const attemptId = id("attempt");
     await collections.researchAttempts.insertOne({
       _id: attemptId,
@@ -163,12 +188,12 @@ export async function spawnDevinResearchAgents(episodeId: string, title: string,
       if (!session.session_id) throw new Error("Devin create-session response did not include session_id");
       await recordAttempt(episodeId, attemptId, { status: "RUNNING", proofState: `Devin session created: ${session.session_id}`, input: { provider: "devin", role: role.name, organizationId, sessionId: session.session_id, sessionUrl: session.url, prompt: role.prompt } });
       await emit(episodeId, "research.devin.started", { attemptId, sessionId: session.session_id, role: role.name, sessionUrl: session.url });
-      void monitorSession(organizationId, episodeId, attemptId, session.session_id).catch(async (error) => {
-        await recordAttempt(episodeId, attemptId, { status: "FAILED", error: error instanceof Error ? error.message : "Devin monitor failed", completedAt: new Date() });
-      });
+      return await monitorSession(organizationId, episodeId, attemptId, session.session_id, role);
     } catch (error) {
-      await recordAttempt(episodeId, attemptId, { status: "FAILED", error: error instanceof Error ? error.message : "Devin session creation failed", proofState: "Devin session could not be created.", completedAt: new Date() });
-      await emit(episodeId, "research.devin.failed", { attemptId, role: role.name, error: error instanceof Error ? error.message : "Devin session creation failed" });
+      const message = error instanceof Error ? error.message : "Devin session failed";
+      await recordAttempt(episodeId, attemptId, { status: "FAILED", error: message, proofState: "Devin session could not produce a report.", completedAt: new Date() });
+      await emit(episodeId, "research.devin.failed", { attemptId, role: role.name, error: message });
+      return { role: role.name, strategy: role.strategy, status: "failed", report: message };
     }
   }));
 }
