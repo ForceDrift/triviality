@@ -7,6 +7,7 @@ import { IconArrowLeft, IconCheck, IconCode, IconFileDescription, IconLoader2 } 
 import { DashboardSidebar } from "../../dashboard-sidebar";
 import { DashboardTopbar } from "../../dashboard-topbar";
 import { ResearchGraph } from "@/components/research-graph";
+import { ResearchLiteratureTabs } from "@/components/research-literature-tabs";
 import { getResearchJob, type ResearchJob } from "@/lib/research-store";
 
 type ArtifactTab = "literature" | "lean" | "latex";
@@ -73,14 +74,10 @@ function CompletedEpisode({ job, tab, setTab }: { job: ResearchJob; tab: Artifac
 
     <section><SectionLabel>Research frontier</SectionLabel><div className="grid gap-3 md:grid-cols-2">{job.hypotheses.map((hypothesis) => <div key={hypothesis.id} className="rounded-2xl border border-black/10 p-6"><div className="flex items-center justify-between gap-4"><p className="text-lg font-semibold tracking-[-0.04em]">{hypothesis.title}</p><span className="font-mono text-xs text-black/45">{Math.round(hypothesis.score * 100)}%</span></div><p className="mt-3 text-sm leading-6 text-black/55">{hypothesis.statement}</p><div className="mt-5 flex items-center justify-between text-[9px] font-semibold uppercase tracking-[0.16em] text-black/40"><span>{hypothesis.approach}</span><span>{hypothesis.status}</span></div></div>)}</div></section>
 
-    <section><div className="mb-6 flex flex-col justify-between gap-4 border-b border-black/10 pb-5 sm:flex-row sm:items-end"><div><SectionLabel>Generated research</SectionLabel><h2 className="mt-2 text-3xl font-semibold tracking-[-0.06em]">Literature and proof artifacts</h2></div><div className="flex gap-1 rounded-full border border-black/10 p-1">{(["literature", "lean", "latex"] as ArtifactTab[]).map((item) => <button key={item} className={`rounded-full px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.15em] transition ${tab === item ? "bg-black text-white" : "text-black/45 hover:text-black"}`} onClick={() => setTab(item)}>{item === "lean" ? "Lean 4" : item}</button>)}</div></div>{tab === "literature" ? <LiteratureList job={job} /> : <ProofArtifact job={job} tab={tab} />}</section>
+    <section><div className="mb-6 flex flex-col justify-between gap-4 border-b border-black/10 pb-5 sm:flex-row sm:items-end"><div><SectionLabel>Generated research</SectionLabel><h2 className="mt-2 text-3xl font-semibold tracking-[-0.06em]">Literature and proof artifacts</h2></div><div className="flex gap-1 rounded-full border border-black/10 p-1">{(["literature", "lean", "latex"] as ArtifactTab[]).map((item) => <button key={item} className={`rounded-full px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.15em] transition ${tab === item ? "bg-black text-white" : "text-black/45 hover:text-black"}`} onClick={() => setTab(item)}>{item === "lean" ? "Lean 4" : item}</button>)}</div></div>{tab === "literature" ? <ResearchLiteratureTabs jobId={job.id} papers={job.literature} /> : <ProofArtifact job={job} tab={tab} />}</section>
 
     <section><SectionLabel>Attempt memory</SectionLabel><div className="mt-4 overflow-hidden rounded-2xl border border-black/10">{job.attempts.map((attempt, index) => <div key={attempt.id} className="grid gap-2 border-b border-black/10 p-5 last:border-b-0 sm:grid-cols-[1.1fr_1fr_1.5fr] sm:items-center"><div className="flex items-center gap-3"><span className="font-mono text-[10px] text-black/35">0{index + 1}</span><span className="text-sm font-semibold">{attempt.role}</span></div><span className="text-xs text-black/45">{attempt.strategy}</span><span className="flex items-center gap-2 text-xs text-black/55"><IconCheck size={14} /> {attempt.result}</span></div>)}</div></section>
   </div>;
-}
-
-function LiteratureList({ job }: { job: ResearchJob }) {
-  return <div className="grid gap-4 md:grid-cols-2">{job.literature.map((paper) => <article key={paper.id} className="rounded-2xl border border-black/10 p-6"><div className="flex items-center justify-between gap-4 text-[9px] font-semibold uppercase tracking-[0.16em] text-black/40"><span>{paper.source}</span><span>{paper.discovery === "expanded" ? "Expanded graph" : "Seed graph"} · {paper.year}</span></div><h3 className="mt-5 text-xl font-semibold tracking-[-0.05em]">{paper.title}</h3><p className="mt-2 text-xs text-black/45">{paper.authors}</p><p className="mt-5 text-sm leading-7 text-black/60">{paper.summary}</p><div className="mt-5 border-t border-black/10 pt-4 text-xs leading-5 text-black/50"><span className="font-semibold text-black/70">Why it matters. </span>{paper.relevance}</div></article>)}</div>;
 }
 
 function ProofArtifact({ job, tab }: { job: ResearchJob; tab: "lean" | "latex" }) {

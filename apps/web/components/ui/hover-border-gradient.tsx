@@ -17,6 +17,7 @@ export function HoverBorderGradient({
 }: React.PropsWithChildren<
   {
     as?: React.ElementType;
+    href?: string;
     containerClassName?: string;
     className?: string;
     duration?: number;
