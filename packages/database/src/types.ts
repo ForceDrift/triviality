@@ -46,6 +46,7 @@ export interface ResearchAttemptDocument extends BaseDocument { episodeId: strin
 export interface ResearchResultDocument extends BaseDocument { episodeId: string; hypothesisId?: string; attemptId?: string; title: string; summary: string; status: ResultStatus; evidence?: unknown; }
 
 export interface PaperDocument extends BaseDocument { externalId: string; title: string; abstract?: string; doi?: string; authors?: string[]; subjects: string[]; publishedAt?: Date; citedByCount: number; relevanceScore?: number; landingUrl?: string; openAccessUrl?: string; rawMetadata?: unknown; }
+export interface ResearchEpisodePaperDocument extends BaseDocument { episodeId: string; paperId: string; source: string; relevance: string; rank: number; }
 export interface TheoremDocument extends BaseDocument { paperId?: string; name: string; statement: string; assumptions?: unknown; }
 export interface LemmaDocument extends BaseDocument { paperId?: string; name: string; statement: string; assumptions?: unknown; }
 export interface DefinitionDocument extends BaseDocument { paperId?: string; name: string; statement: string; }

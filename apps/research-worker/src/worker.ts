@@ -160,13 +160,30 @@ async function runEpisode(episodeId: string): Promise<void> {
     await addGraphNode(episodeId, problem._id, "RESEARCH_PROBLEM", "Target problem", episode.title, 50, 13, "active");
     await updateStage(episodeId, "Scanning OpenAlex literature", 18);
     const works = await fetchLiterature(episode.title, problem.statement);
-    const paperIds: string[] = [];
+    const paperGraphNodeIds: string[] = [];
     for (const work of works) {
       const paperId = `paper_${createHash("sha1").update(work.id).digest("hex").slice(0, 16)}`;
-      paperIds.push(paperId);
+      const episodePaperId = `episode_paper_${createHash("sha1").update(`${episodeId}:${paperId}`).digest("hex").slice(0, 16)}`;
+      paperGraphNodeIds.push(episodePaperId);
       const now = new Date();
-      await collections.papers.updateOne({ _id: paperId }, { $set: { externalId: work.id, title: work.title ?? "Untitled paper", abstract: abstractFromIndex(work.abstract_inverted_index) ?? undefined, authors: (work.authorships ?? []).map((author) => author.author?.display_name ?? "").filter(Boolean), subjects: [episode.area ?? "mathematics"], citedByCount: work.cited_by_count ?? 0, publishedAt: work.publication_date ? new Date(work.publication_date) : undefined, landingUrl: work.primary_location?.landing_page_url ?? undefined, openAccessUrl: work.open_access?.oa_url ?? work.primary_location?.pdf_url ?? undefined, rawMetadata: { episodeId, source: "OpenAlex", relevance: "Retrieved by semantic query over the research target." }, updatedAt: now }, $setOnInsert: { createdAt: now } }, { upsert: true });
-      await addGraphNode(episodeId, paperId, "PAPER", `Literature ${paperIds.length}`, work.title ?? "Untitled paper", 12 + paperIds.length * 15, 63, "candidate");
+      await collections.papers.updateOne(
+        { _id: paperId },
+        {
+          $set: { externalId: work.id, title: work.title ?? "Untitled paper", abstract: abstractFromIndex(work.abstract_inverted_index) ?? undefined, authors: (work.authorships ?? []).map((author) => author.author?.display_name ?? "").filter(Boolean), citedByCount: work.cited_by_count ?? 0, publishedAt: work.publication_date ? new Date(work.publication_date) : undefined, landingUrl: work.primary_location?.landing_page_url ?? undefined, openAccessUrl: work.open_access?.oa_url ?? work.primary_location?.pdf_url ?? undefined, updatedAt: now },
+          $addToSet: { subjects: episode.area ?? "mathematics" },
+          $setOnInsert: { createdAt: now },
+        },
+        { upsert: true },
+      );
+      await collections.researchEpisodePapers.updateOne(
+        { _id: episodePaperId },
+        {
+          $set: { episodeId, paperId, source: "OpenAlex", relevance: "Retrieved by semantic query over the research target.", rank: paperGraphNodeIds.length, updatedAt: now },
+          $setOnInsert: { createdAt: now },
+        },
+        { upsert: true },
+      );
+      await addGraphNode(episodeId, episodePaperId, "PAPER", `Literature ${paperGraphNodeIds.length}`, work.title ?? "Untitled paper", 12 + paperGraphNodeIds.length * 15, 63, "candidate");
     }
     await emit(episodeId, "research.literature.completed", { count: works.length });
 
@@ -194,7 +211,7 @@ async function runEpisode(episodeId: string): Promise<void> {
       await collections.researchHypotheses.insertOne({ _id: hypothesisId, episodeId, problemId: problem._id, statement: hypothesis.statement, rationale: hypothesis.title, assumptions: "", expectedConsequences: { approach: hypothesis.approach, rationale: hypothesis.rationale }, noveltyEstimate: 0.5, plausibilityEstimate: hypothesis.plausibility, formalizability: 0.6, status: "PROMISING", createdAt: now, updatedAt: now });
       await addGraphNode(episodeId, hypothesisId, "RESEARCH_HYPOTHESIS", `H${index + 1} · ${hypothesis.title}`, hypothesis.approach, 22 + index * 25, 35, "active");
       await addGraphEdge(episodeId, problem._id, hypothesisId, "PRODUCES", "explores");
-      if (paperIds[index]) await addGraphEdge(episodeId, hypothesisId, paperIds[index], "USES", "informed by");
+      if (paperGraphNodeIds[index]) await addGraphEdge(episodeId, hypothesisId, paperGraphNodeIds[index], "USES", "informed by");
     }
 
     const attemptId = id("attempt");

@@ -48,16 +48,19 @@ async function serializeJob(episodeId: string) {
   const episode = await collections.researchEpisodes.findOne({ _id: episodeId });
   if (!episode) return null;
 
-  const [problem, hypotheses, attempts, results, papers, formalization, graphNodes, graphEdges] = await Promise.all([
+  const [problem, hypotheses, attempts, results, paperReferences, formalization, graphNodes, graphEdges] = await Promise.all([
     collections.researchProblems.findOne({ episodeId }),
     collections.researchHypotheses.find({ episodeId }).sort({ createdAt: 1 }).toArray(),
     collections.researchAttempts.find({ episodeId }).sort({ createdAt: 1 }).toArray(),
     collections.researchResults.find({ episodeId }).sort({ createdAt: 1 }).toArray(),
-    collections.papers.find({ "rawMetadata.episodeId": episodeId }).sort({ createdAt: 1 }).toArray(),
+    collections.researchEpisodePapers.find({ episodeId }).sort({ rank: 1 }).toArray(),
     collections.formalizations.findOne({ episodeId }),
     collections.graphNodes.find({ "metadata.episodeId": episodeId }).sort({ createdAt: 1 }).toArray(),
     collections.graphRelationships.find({ "metadata.episodeId": episodeId }).sort({ createdAt: 1 }).toArray(),
   ]);
+  const paperIds = paperReferences.map((reference) => reference.paperId);
+  const papers = paperIds.length ? await collections.papers.find({ _id: { $in: paperIds } }).toArray() : [];
+  const papersById = new Map(papers.map((paper) => [paper._id, paper]));
 
   const graph = graphNodes.map((node) => {
     const metadata = metadataOf(node.metadata);
@@ -103,18 +106,18 @@ async function serializeJob(episodeId: string) {
       target: edge.toNodeId,
       label: String(metadataOf(edge.metadata).label ?? edge.type.toLowerCase()),
     })),
-    literature: papers.map((paper) => {
-      const metadata = metadataOf(paper.rawMetadata);
-      return {
+    literature: paperReferences.flatMap((reference) => {
+      const paper = papersById.get(reference.paperId);
+      return paper ? [{
         id: paper._id,
         title: paper.title,
         authors: (paper.authors ?? []).join(", "),
-        source: String(metadata.source ?? "OpenAlex"),
+        source: reference.source,
         year: String(paper.publishedAt?.getFullYear() ?? "n.d."),
         summary: paper.abstract ?? "No abstract was available for this source.",
-        relevance: String(metadata.relevance ?? "Retrieved for the current research target."),
+        relevance: reference.relevance,
         url: paper.landingUrl ?? paper.openAccessUrl ?? "#",
-      };
+      }] : [];
     }),
     hypotheses: hypotheses.map((hypothesis) => ({
       id: hypothesis._id,
