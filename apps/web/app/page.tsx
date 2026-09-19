@@ -158,7 +158,7 @@ function GraphPreview() {
     <PreviewShell>
       <div className="flex items-center justify-between text-[9px] font-semibold uppercase tracking-[0.16em] text-black/40">
         <span>research graph</span>
-        <span className="font-mono text-[8px] text-black/25">04 nodes</span>
+        <span className="font-mono text-[8px] text-black/25">02 nodes</span>
       </div>
       <div className="relative mt-3 h-[calc(100%-1.25rem)]">
         <svg
@@ -179,15 +179,10 @@ function GraphPreview() {
               <path d="M0,0 L5,2.5 L0,5" fill="none" stroke="currentColor" strokeWidth="1" />
             </marker>
           </defs>
-          <path d="M26 25 C43 19, 57 19, 74 25" fill="none" markerEnd="url(#graph-arrow)" stroke="currentColor" strokeOpacity="0.22" strokeWidth="0.7" />
-          <path d="M24 31 C28 44, 31 52, 34 68" fill="none" markerEnd="url(#graph-arrow)" stroke="currentColor" strokeOpacity="0.22" strokeWidth="0.7" />
-          <path d="M76 31 C72 44, 69 52, 66 68" fill="none" markerEnd="url(#graph-arrow)" stroke="currentColor" strokeOpacity="0.22" strokeWidth="0.7" />
-          <path d="M42 75 C48 79, 53 79, 59 75" fill="none" markerEnd="url(#graph-arrow)" stroke="currentColor" strokeOpacity="0.22" strokeWidth="0.7" />
+          <path d="M25 50 C39 43, 61 43, 75 50" fill="none" markerEnd="url(#graph-arrow)" stroke="currentColor" strokeOpacity="0.22" strokeWidth="0.7" />
         </svg>
-        <GraphNode className="left-[1%] top-[10%]" detail="claim" label="THEOREM" />
-        <GraphNode className="right-[1%] top-[10%]" detail="support" label="LEMMA" />
-        <GraphNode className="left-[10%] bottom-[8%]" detail="technique" label="METHOD" />
-        <GraphNode active className="right-[10%] bottom-[8%]" detail="direction" label="IDEA" />
+        <GraphNode className="left-[1%] top-[38%]" detail="claim" label="THEOREM" />
+        <GraphNode className="right-[1%] top-[38%]" detail="support" label="LEMMA" />
       </div>
     </PreviewShell>
   );
@@ -272,7 +267,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="relative z-10 bg-white px-6 pb-24 sm:px-10 lg:px-14">
+      <section className="relative z-10 bg-white px-6 pb-8 sm:px-10 lg:px-14">
         <div className="mx-auto max-w-6xl">
           <p className="mb-7 text-center text-[10px] font-medium uppercase tracking-[0.3em] text-black/40">
             Built for the research network
@@ -300,12 +295,15 @@ export default function Home() {
               </div>
             ))}
           </div>
+          <div className="flex justify-center pt-10" aria-hidden="true">
+            <span className="h-14 w-px bg-black/20" />
+          </div>
         </div>
       </section>
 
-      <section id="explore" className="relative z-10 bg-white px-6 py-24 sm:px-10 lg:px-14 lg:py-32">
+      <section id="explore" className="relative z-10 bg-white px-6 pb-24 pt-8 sm:px-10 lg:px-14 lg:pb-32 lg:pt-10">
         <div className="mx-auto max-w-6xl">
-          <div className="mb-12 max-w-xl">
+          <div className="mx-auto mb-12 max-w-xl text-center">
             <p className="mb-5 text-[10px] font-medium uppercase tracking-[0.3em] text-black/45">
               Explore triviality
             </p>
