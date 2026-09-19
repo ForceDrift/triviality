@@ -1,5 +1,17 @@
 # Triviality
 
+## Included backend
+
+`external/norththehackers/` contains regular files tracked by this repository,
+imported from `sharonbasovich/norththehackers` main at
+`04b9875ab1f0e50e0f20a1ab68ff3dfaa01f6883`. A normal clone includes the backend,
+explorer, Lean project, and research snapshots; no submodule setup is required.
+
+See [backend setup and commands](docs/backend.md). After installing its Python
+dependencies, `pnpm backend:dev` starts the imported API on port 8000. The
+existing Triviality dashboard continues to use the research API on port 3010
+described below.
+
 ## WorkSwarm research team
 
 The **WorkSwarm** orchestration layer runs a reusable Swarm Skill with parallel

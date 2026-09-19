@@ -22,14 +22,14 @@ export default function ResearchLiteraturePage() {
   const paper = job.literature.find((item) => item.id === decodeURIComponent(params.paperId));
 
   if (!paper) {
-    return <main className="flex min-h-screen items-center justify-center bg-white text-sm text-black/55">This paper is not attached to the episode.</main>;
+    return <main className="flex min-h-screen items-center justify-center bg-white text-sm text-black/55">Paper not found.</main>;
   }
 
   const blogPaper: LiteraturePaper = {
     id: paper.id,
     href: `/dashboard/research/${encodeURIComponent(job.id)}`,
     date: paper.year,
-    category: `${job.area} · ${paper.discovery === "expanded" ? "Expanded graph" : "Seed literature"}`,
+    category: paper.source,
     title: paper.title,
     subtitle: paper.summary,
     authors: paper.authors,
@@ -43,12 +43,12 @@ export default function ResearchLiteraturePage() {
       {
         id: "research-connection",
         title: "Research connection",
-        markdown: `${paper.relevance}\n\nThis paper was selected for the research space **${job.title}** in **${job.area}**.`,
+        markdown: paper.relevance,
       },
       {
-        id: "episode-role",
-        title: "Role in this episode",
-        markdown: `This is **${paper.discovery === "expanded" ? "expanded graph" : "seed literature"}**. Its claims and techniques are attached to the episode graph so future hypotheses can use this paper as evidence.\n\n[Open the original source paper](${paper.url})`,
+        id: "source",
+        title: "Source",
+        markdown: `[${paper.source}](${paper.url})`,
       },
     ],
   };

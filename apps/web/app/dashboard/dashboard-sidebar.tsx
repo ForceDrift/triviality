@@ -4,9 +4,7 @@ import {
   IconBook2,
   IconGraph,
   IconHome2,
-  IconLogout,
-  IconPlus,
-  IconSettings,
+  IconArrowLeft,
 } from "@tabler/icons-react";
 import { TrivialityLogo } from "@/components/triviality-logo";
 import {
@@ -20,7 +18,6 @@ const links = [
   { label: "Overview", href: "/dashboard", icon: <IconHome2 size={20} /> },
   { label: "Research graph", href: "/dashboard/graph", icon: <IconGraph size={20} /> },
   { label: "Literature", href: "/dashboard/literature", icon: <IconBook2 size={20} /> },
-  { label: "Research", href: "/dashboard#new-episode", icon: <IconPlus size={20} /> },
 ];
 
 export function DashboardSidebar() {
@@ -39,16 +36,9 @@ export function DashboardSidebar() {
         <div className="flex flex-col gap-3">
           <SidebarLink
             link={{
-              label: "Settings",
-              href: "/dashboard",
-              icon: <IconSettings size={20} />,
-            }}
-          />
-          <SidebarLink
-            link={{
-              label: "Log out",
+              label: "Home",
               href: "/",
-              icon: <IconLogout size={20} />,
+              icon: <IconArrowLeft size={20} />,
             }}
           />
         </div>

@@ -22,8 +22,7 @@ export function ResearchGraph({ job, compact = false }: { job: ResearchJob; comp
   return (
     <div className={`relative overflow-hidden rounded-2xl border border-black/10 bg-[#fafafa] ${compact ? "min-h-[360px]" : "min-h-[520px]"}`}>
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.035)_1px,transparent_1px)] bg-[size:32px_32px]" />
-      <div className="relative z-10 flex items-center justify-between border-b border-black/10 px-5 py-4 text-[10px] font-medium uppercase tracking-[0.22em] text-black/45">
-        <span>Research graph</span>
+      <div className="relative z-10 flex items-center justify-end border-b border-black/10 px-5 py-3 text-xs text-black/45">
         <span>{job.nodes.length} nodes · {job.edges.length} relations</span>
       </div>
 
