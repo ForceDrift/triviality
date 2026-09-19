@@ -1,7 +1,12 @@
+import modelCatalog from "../../../config/research-models.json";
+export { modelCatalog };
+export type RoleModels = Record<string, string>;
+export const defaultRoleModels: RoleModels = Object.fromEntries(modelCatalog.roles.map((role) => [role.id, modelCatalog.defaultModel]));
+
 export type ResearchJobStatus = "running" | "completed" | "failed";
 export type ResearchProvider = "openai" | "devin" | "huawei";
 
-export type ResearchNodeType = "problem" | "hypothesis" | "paper" | "lemma" | "proof" | "result";
+export type ResearchNodeType = "problem" | "hypothesis" | "paper" | "lemma" | "proof" | "result" | "formalization";
 
 export interface ResearchNode {
   id: string;
@@ -38,7 +43,7 @@ export interface ResearchHypothesis {
   statement: string;
   approach: string;
   status: "promising" | "candidate" | "disproved";
-  score: number;
+  score?: number;
 }
 
 export interface ResearchAttempt {
@@ -84,10 +89,13 @@ export interface ResearchJob {
   statement: string;
   researchSpace?: { name: string; statement: string; assumptions?: unknown };
   area: string;
-  provider: ResearchProvider;
+  provider?: ResearchProvider;
+  orchestrator?: "workswarm";
+  roleModels?: RoleModels;
   mode: string;
-  configuration?: { provider: ResearchProvider; mode: string; budget: number };
+  configuration?: { provider?: ResearchProvider; orchestrator?: "workswarm"; roleModels?: RoleModels; mode: string; budget: number };
   budget: number;
+  leanStatement?: string;
   status: ResearchJobStatus;
   stage: string;
   progress: number;
@@ -120,7 +128,7 @@ export function getResearchJob(id: string): Promise<ResearchJob> {
   return request<ResearchJob>(`/${encodeURIComponent(id)}`);
 }
 
-export function createResearchJob(input: { title: string; statement: string; area: string; provider: ResearchProvider; mode: string; budget: number }): Promise<ResearchJob> {
+export function createResearchJob(input: { title: string; statement: string; area: string; roleModels: RoleModels; mode: string; budget: number; leanStatement?: string }): Promise<ResearchJob> {
   return request<ResearchJob>("", { method: "POST", body: JSON.stringify(input) });
 }
 
@@ -128,7 +136,7 @@ export function getResearchStats(jobs: ResearchJob[]): { total: number; running:
   return {
     total: jobs.length,
     running: jobs.filter((job) => job.status === "running").length,
-    verified: jobs.filter((job) => job.proof?.status === "verified").length,
+    verified: jobs.filter((job) => job.results?.some((result) => result.title === "Verified formal target" && result.status === "VERIFIED")).length,
     literature: jobs.reduce((count, job) => count + job.literature.length, 0),
   };
 }

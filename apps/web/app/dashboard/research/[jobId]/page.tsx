@@ -8,7 +8,7 @@ import { DashboardSidebar } from "../../dashboard-sidebar";
 import { DashboardTopbar } from "../../dashboard-topbar";
 import { ResearchGraph } from "@/components/research-graph";
 import { ResearchLiteratureTabs } from "@/components/research-literature-tabs";
-import { getResearchJob, type ResearchJob } from "@/lib/research-store";
+import { getResearchJob, modelCatalog, type ResearchJob } from "@/lib/research-store";
 
 type ArtifactTab = "literature" | "lean" | "latex";
 
@@ -46,15 +46,27 @@ export default function ResearchEpisodePage() {
             <div className="w-full max-w-xs shrink-0"><div className="mb-2 flex justify-between text-[9px] font-semibold uppercase tracking-[0.18em] text-black/40"><span>{job.stage}</span><span>{job.progress}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-black/8"><div className="h-full rounded-full bg-black transition-all duration-500" style={{ width: `${job.progress}%` }} /></div></div>
           </div>
 
+          {job.roleModels && <section className="mt-6 rounded-xl border border-black/10 bg-white p-5"><h2 className="text-sm font-semibold">WorkSwarm / Model assignments</h2><dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{modelCatalog.roles.map((role) => <div key={role.id}><dt className="text-xs text-black/45">{role.label}</dt><dd className="mt-1 text-sm">{modelCatalog.models.find((model) => model.id === job.roleModels?.[role.id])?.label ?? job.roleModels?.[role.id]}</dd></div>)}</dl></section>}
           {job.status === "running" ? <RunningEpisode job={job} /> : job.status === "failed" ? <FailedEpisode job={job} /> : <CompletedEpisode job={job} tab={tab} setTab={setTab} />}
+          {(job.orchestrator === "workswarm" || job.provider === "huawei") && <TeamTrace job={job} />}
         </section>
       </div>
     </main>
   );
 }
 
+function TeamTrace({ job }: { job: ResearchJob }) {
+  const decisions = (job.events ?? []).flatMap((event) => {
+    const progress = event.payload.event as { kind?: string; message?: string } | undefined;
+    if (event.type !== "research.swarm.event" || progress?.kind !== "log" || !progress.message?.startsWith("TRIVIALITY_EVENT ")) return [];
+    try { return [{ id: event.id, ...JSON.parse(progress.message.slice(17)) } as { id: string; kind: string; feedback?: string; summary?: string; reason?: string }]; }
+    catch { return []; }
+  }).filter((event) => ["replan", "repair", "reassignment", "delivery"].includes(event.kind));
+  return <section className="mt-10 rounded-2xl border border-black/10 bg-white p-6"><SectionLabel>Research team collaboration</SectionLabel><p className="mt-3 text-sm text-black/55">Researchers share findings with the critic. The proof writer receives their evidence and checker feedback.</p><div className="mt-5 grid gap-3 sm:grid-cols-2">{job.attempts.map((attempt) => <article key={attempt.id} className="rounded-xl border border-black/10 p-4"><div className="flex justify-between gap-3 text-sm"><strong>{attempt.role}</strong><span className="text-black/50">{attempt.status}</span></div><p className="mt-2 text-xs text-black/45">{attempt.strategy}</p><details className="mt-3 text-xs"><summary className="cursor-pointer">Findings and handoff</summary><pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap text-black/60">{attempt.result}</pre></details></article>)}</div>{decisions.map((event) => <p key={event.id} className="mt-3 border-l-2 border-black/30 pl-3 text-xs leading-6 text-black/65"><strong>{event.kind}: </strong>{event.feedback ?? event.summary ?? event.reason}</p>)}</section>;
+}
+
 function RunningEpisode({ job }: { job: ResearchJob }) {
-  return <div className="mx-auto max-w-3xl py-24 text-center"><IconLoader2 className="mx-auto animate-spin text-black/45" size={28} /><p className="mt-6 text-2xl font-semibold tracking-[-0.05em]">The research director is working.</p><p className="mx-auto mt-3 max-w-md text-sm leading-6 text-black/50">Literature, hypotheses, counterexamples, and formal artifacts are being assembled into a resumable episode.</p><div className="mx-auto mt-10 grid max-w-xl gap-px overflow-hidden rounded-2xl border border-black/10 bg-black/10 text-left sm:grid-cols-3"><Stage active={job.progress >= 25} title="Literature" copy="Find structural neighbors" /><Stage active={job.progress >= 55} title="Frontier" copy="Keep competing ideas" /><Stage active={job.progress >= 88} title="Formalize" copy="Check the smallest claim" /></div></div>;
+  return <div className="mx-auto max-w-3xl py-24 text-center"><IconLoader2 className="mx-auto animate-spin text-black/45" size={28} /><p className="mt-6 text-2xl font-semibold tracking-[-0.05em]">The research director is working.</p><p className="mx-auto mt-3 max-w-md text-sm leading-6 text-black/50">Literature, hypotheses, counterexamples, and formal artifacts are being assembled into a resumable episode.</p><div className="mx-auto mt-10 grid max-w-xl gap-px overflow-hidden rounded-2xl border border-black/10 bg-black/10 text-left sm:grid-cols-3"><Stage active={job.progress >= 25} title="Literature" copy="Find structural neighbors" /><Stage active={job.progress >= 55} title="Frontier" copy="Keep competing ideas" /><Stage active={job.progress >= 88} title="Formalize" copy="Check the fixed target" /></div></div>;
 }
 
 function FailedEpisode({ job }: { job: ResearchJob }) {
@@ -72,7 +84,7 @@ function CompletedEpisode({ job, tab, setTab }: { job: ResearchJob; tab: Artifac
       <div className="rounded-2xl border border-black/10 p-6"><p className="mb-4 text-[10px] font-medium uppercase tracking-[0.24em] text-black/45">Episode result</p><p className="text-sm leading-7 text-black/65">{job.summary}</p><div className="mt-7 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-black/10 bg-black/10"><Metric label="hypotheses" value={String(job.hypotheses.length)} /><Metric label="attempts" value={String(job.attempts.length)} /><Metric label="literature" value={String(job.literature.length)} /><Metric label="proofs" value={job.proof?.status === "verified" ? "01" : "00"} /></div></div>
     </div>
 
-    <section><SectionLabel>Research frontier</SectionLabel><div className="grid gap-3 md:grid-cols-2">{job.hypotheses.map((hypothesis) => <div key={hypothesis.id} className="rounded-2xl border border-black/10 p-6"><div className="flex items-center justify-between gap-4"><p className="text-lg font-semibold tracking-[-0.04em]">{hypothesis.title}</p><span className="font-mono text-xs text-black/45">{Math.round(hypothesis.score * 100)}%</span></div><p className="mt-3 text-sm leading-6 text-black/55">{hypothesis.statement}</p><div className="mt-5 flex items-center justify-between text-[9px] font-semibold uppercase tracking-[0.16em] text-black/40"><span>{hypothesis.approach}</span><span>{hypothesis.status}</span></div></div>)}</div></section>
+    <section><SectionLabel>Research frontier</SectionLabel><div className="grid gap-3 md:grid-cols-2">{job.hypotheses.map((hypothesis) => <div key={hypothesis.id} className="rounded-2xl border border-black/10 p-6"><div className="flex items-center justify-between gap-4"><p className="text-lg font-semibold tracking-[-0.04em]">{hypothesis.title}</p>{hypothesis.score !== undefined && <span className="font-mono text-xs text-black/45">{Math.round(hypothesis.score * 100)}%</span>}</div><p className="mt-3 text-sm leading-6 text-black/55">{hypothesis.statement}</p><div className="mt-5 flex items-center justify-between text-[9px] font-semibold uppercase tracking-[0.16em] text-black/40"><span>{hypothesis.approach}</span><span>{hypothesis.status}</span></div></div>)}</div></section>
 
     <section><div className="mb-6 flex flex-col justify-between gap-4 border-b border-black/10 pb-5 sm:flex-row sm:items-end"><div><SectionLabel>Generated research</SectionLabel><h2 className="mt-2 text-3xl font-semibold tracking-[-0.06em]">Literature and proof artifacts</h2></div><div className="flex gap-1 rounded-full border border-black/10 p-1">{(["literature", "lean", "latex"] as ArtifactTab[]).map((item) => <button key={item} className={`rounded-full px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.15em] transition ${tab === item ? "bg-black text-white" : "text-black/45 hover:text-black"}`} onClick={() => setTab(item)}>{item === "lean" ? "Lean 4" : item}</button>)}</div></div>{tab === "literature" ? <ResearchLiteratureTabs jobId={job.id} papers={job.literature} /> : <ProofArtifact job={job} tab={tab} />}</section>
 

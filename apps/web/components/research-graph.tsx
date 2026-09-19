@@ -8,6 +8,7 @@ const nodeStyles: Record<ResearchNodeType, { dot: string; badge: string }> = {
   paper: { dot: "bg-[#d8d8d8]", badge: "bg-[#f2f2f2] text-black/65" },
   lemma: { dot: "bg-white ring-2 ring-black/60", badge: "bg-white text-black border border-black/25" },
   proof: { dot: "bg-black", badge: "bg-black text-white" },
+  formalization: { dot: "bg-black", badge: "bg-black text-white" },
   result: { dot: "bg-white ring-2 ring-black/30", badge: "bg-white text-black/70 border border-black/15" },
 };
 
