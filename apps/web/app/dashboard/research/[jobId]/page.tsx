@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { useParams } from "next/navigation";
 import { IconArrowLeft, IconCheck, IconCode, IconFileDescription, IconLoader2 } from "@tabler/icons-react";
 import { DashboardSidebar } from "../../dashboard-sidebar";
@@ -16,7 +19,7 @@ export default function ResearchEpisodePage() {
   const params = useParams<{ jobId: string }>();
   const [job, setJob] = useState<ResearchJob | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<ArtifactTab>("literature");
+  const [tab, setTab] = useState<ArtifactTab>("latex");
 
   useEffect(() => {
     const refresh = () => getResearchJob(params.jobId).then(setJob).catch((reason: Error) => setError(reason.message));
@@ -30,7 +33,7 @@ export default function ResearchEpisodePage() {
   }
 
   return (
-    <main className="flex min-h-screen bg-[#f5f5f5] text-[#111]">
+    <main className="flex min-h-screen flex-col bg-[#f5f5f5] text-[#111] md:flex-row">
       <DashboardSidebar />
       <div className="min-w-0 flex-1">
         <DashboardTopbar page="Research episode" />
@@ -62,7 +65,12 @@ function TeamTrace({ job }: { job: ResearchJob }) {
     try { return [{ id: event.id, ...JSON.parse(progress.message.slice(17)) } as { id: string; kind: string; feedback?: string; summary?: string; reason?: string }]; }
     catch { return []; }
   }).filter((event) => ["replan", "repair", "reassignment", "delivery"].includes(event.kind));
-  return <section className="mt-10 rounded-2xl border border-black/10 bg-white p-6"><SectionLabel>Research team collaboration</SectionLabel><p className="mt-3 text-sm text-black/55">Researchers share findings with the critic. The proof writer receives their evidence and checker feedback.</p><div className="mt-5 grid gap-3 sm:grid-cols-2">{job.attempts.map((attempt) => <article key={attempt.id} className="rounded-xl border border-black/10 p-4"><div className="flex justify-between gap-3 text-sm"><strong>{attempt.role}</strong><span className="text-black/50">{attempt.status}</span></div><p className="mt-2 text-xs text-black/45">{attempt.strategy}</p><details className="mt-3 text-xs"><summary className="cursor-pointer">Findings and handoff</summary><pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap text-black/60">{attempt.result}</pre></details></article>)}</div>{decisions.map((event) => <p key={event.id} className="mt-3 border-l-2 border-black/30 pl-3 text-xs leading-6 text-black/65"><strong>{event.kind}: </strong>{event.feedback ?? event.summary ?? event.reason}</p>)}</section>;
+  return <details className="mt-10 rounded-2xl border border-black/10 bg-white p-6">
+    <summary className="cursor-pointer text-sm font-semibold">Research team collaboration <span className="ml-2 font-normal text-black/45">{job.attempts.length} attempts</span></summary>
+    <p className="mt-3 text-sm text-black/55">Research findings, critique, and proof handoffs.</p>
+    <div className="mt-5 space-y-3">{job.attempts.map((attempt) => <details key={attempt.id} className="rounded-xl border border-black/10 p-4"><summary className="cursor-pointer text-sm"><strong>{attempt.role}</strong><span className="ml-3 text-xs text-black/45">{attempt.status}</span></summary><p className="mt-3 text-xs text-black/45">{attempt.strategy}</p><pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap text-xs leading-6 text-black/60">{attempt.result}</pre></details>)}</div>
+    {decisions.length > 0 && <details className="mt-4"><summary className="cursor-pointer text-xs font-semibold">Team decisions ({decisions.length})</summary>{decisions.map((event) => <p key={event.id} className="mt-3 border-l-2 border-black/30 pl-3 text-xs leading-6 text-black/65"><strong>{event.kind}: </strong>{event.feedback ?? event.summary ?? event.reason}</p>)}</details>}
+  </details>;
 }
 
 function RunningEpisode({ job }: { job: ResearchJob }) {
@@ -79,29 +87,51 @@ function Stage({ active, title, copy }: { active: boolean; title: string; copy: 
 
 function CompletedEpisode({ job, tab, setTab }: { job: ResearchJob; tab: ArtifactTab; setTab: (tab: ArtifactTab) => void }) {
   return <div className="space-y-14 pt-10">
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1.55fr)_minmax(18rem,0.45fr)] lg:items-start">
-      <ResearchGraph job={job} />
-      <div className="rounded-2xl border border-black/10 p-6"><p className="mb-4 text-[10px] font-medium uppercase tracking-[0.24em] text-black/45">Episode result</p><p className="text-sm leading-7 text-black/65">{job.summary}</p><div className="mt-7 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-black/10 bg-black/10"><Metric label="hypotheses" value={String(job.hypotheses.length)} /><Metric label="attempts" value={String(job.attempts.length)} /><Metric label="literature" value={String(job.literature.length)} /><Metric label="proofs" value={job.proof?.status === "verified" ? "01" : "00"} /></div></div>
-    </div>
+    <section className={`rounded-2xl border p-7 sm:p-9 ${job.proof?.status === "verified" ? "border-black bg-[#151515] text-white" : "border-black/15 bg-white"}`}>
+      <div className="flex items-start gap-5"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-current/25">{job.proof?.status === "verified" ? <IconCheck size={28} stroke={2.5} /> : <IconFileDescription size={24} />}</span><div>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] opacity-55">Episode result</p>
+        <h2 className="mt-2 text-3xl font-semibold tracking-tight">{job.proof?.status === "verified" ? "PASS · Lean proof checked" : "Research complete · Proof unverified"}</h2>
+        <p className="mt-3 max-w-3xl text-sm leading-7 opacity-70">{job.summary}</p>
+        <a href="#proof-artifacts" onClick={() => setTab("latex")} className="mt-5 inline-block border-b border-current/40 pb-1 text-sm font-semibold">Read the written result ↓</a>
+      </div></div>
+    </section>
+    <section id="proof-artifacts" className="scroll-mt-6"><div className="mb-6 flex flex-col justify-between gap-4 border-b border-black/10 pb-5 sm:flex-row sm:items-end"><div><SectionLabel>Generated research</SectionLabel><h2 className="mt-2 text-3xl font-semibold tracking-[-0.06em]">Literature and proof artifacts</h2></div><div className="flex gap-1 rounded-full border border-black/10 p-1">{(["literature", "lean", "latex"] as ArtifactTab[]).map((item) => <button key={item} className={`rounded-full px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.15em] transition ${tab === item ? "bg-black text-white" : "text-black/45 hover:text-black"}`} onClick={() => setTab(item)}>{item === "lean" ? "Lean 4" : item}</button>)}</div></div>{tab === "literature" ? <ResearchLiteratureTabs jobId={job.id} papers={job.literature} /> : <ProofArtifact job={job} tab={tab} />}</section>
 
-    <section><SectionLabel>Research frontier</SectionLabel><div className="grid gap-3 md:grid-cols-2">{job.hypotheses.map((hypothesis) => <div key={hypothesis.id} className="rounded-2xl border border-black/10 p-6"><div className="flex items-center justify-between gap-4"><p className="text-lg font-semibold tracking-[-0.04em]">{hypothesis.title}</p>{hypothesis.score !== undefined && <span className="font-mono text-xs text-black/45">{Math.round(hypothesis.score * 100)}%</span>}</div><p className="mt-3 text-sm leading-6 text-black/55">{hypothesis.statement}</p><div className="mt-5 flex items-center justify-between text-[9px] font-semibold uppercase tracking-[0.16em] text-black/40"><span>{hypothesis.approach}</span><span>{hypothesis.status}</span></div></div>)}</div></section>
+    <ResearchGraph job={job} />
 
-    <section><div className="mb-6 flex flex-col justify-between gap-4 border-b border-black/10 pb-5 sm:flex-row sm:items-end"><div><SectionLabel>Generated research</SectionLabel><h2 className="mt-2 text-3xl font-semibold tracking-[-0.06em]">Literature and proof artifacts</h2></div><div className="flex gap-1 rounded-full border border-black/10 p-1">{(["literature", "lean", "latex"] as ArtifactTab[]).map((item) => <button key={item} className={`rounded-full px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.15em] transition ${tab === item ? "bg-black text-white" : "text-black/45 hover:text-black"}`} onClick={() => setTab(item)}>{item === "lean" ? "Lean 4" : item}</button>)}</div></div>{tab === "literature" ? <ResearchLiteratureTabs jobId={job.id} papers={job.literature} /> : <ProofArtifact job={job} tab={tab} />}</section>
+    <details className="rounded-2xl border border-black/10 bg-white p-6"><summary className="cursor-pointer text-sm font-semibold">Research frontier <span className="ml-2 font-normal text-black/45">{job.hypotheses.length} investigations</span></summary><div className="mt-5 space-y-4">{job.hypotheses.map((hypothesis) => <details key={hypothesis.id} className="rounded-xl border border-black/10 p-5"><summary className="cursor-pointer text-sm font-semibold">{hypothesis.title}</summary><div className="mt-4 space-y-3 text-sm leading-7 text-black/65"><ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{hypothesis.statement}</ReactMarkdown></div><p className="mt-4 text-xs text-black/45">{hypothesis.status}</p></details>)}</div></details>
 
-    <section><SectionLabel>Attempt memory</SectionLabel><div className="mt-4 overflow-hidden rounded-2xl border border-black/10">{job.attempts.map((attempt, index) => <div key={attempt.id} className="grid gap-2 border-b border-black/10 p-5 last:border-b-0 sm:grid-cols-[1.1fr_1fr_1.5fr] sm:items-center"><div className="flex items-center gap-3"><span className="font-mono text-[10px] text-black/35">0{index + 1}</span><span className="text-sm font-semibold">{attempt.role}</span></div><span className="text-xs text-black/45">{attempt.strategy}</span><span className="flex items-center gap-2 text-xs text-black/55"><IconCheck size={14} /> {attempt.result}</span></div>)}</div></section>
+
+
+
   </div>;
 }
 
 function ProofArtifact({ job, tab }: { job: ResearchJob; tab: "lean" | "latex" }) {
-  if (!job.proof) return <div className="rounded-2xl border border-dashed border-black/15 p-8 text-sm text-black/45">No formal artifact was produced.</div>;
+  const [sourceVisible, setSourceVisible] = useState(false);
+  if (!job.proof) return <div className="rounded-2xl border border-dashed border-black/15 bg-white p-8 text-sm leading-7 text-black/55"><h3 className="font-semibold text-black">No proof artifact was produced</h3><p className="mt-3">{job.summary}</p><p className="mt-3">The research findings and team handoffs below contain the available evidence.</p></div>;
+  const proof = job.proof;
   const isLean = tab === "lean";
-  return <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]"><div className="overflow-hidden rounded-2xl border border-black/10 bg-[#101010] text-white"><div className="flex items-center justify-between border-b border-white/10 px-5 py-4 text-[9px] uppercase tracking-[0.18em] text-white/45"><span className="flex items-center gap-2">{isLean ? <IconCode size={14} /> : <IconFileDescription size={14} />}{isLean ? "proof.lean" : "result.tex"}</span><span>{isLean ? "Lean 4" : "LaTeX"}</span></div><pre className="overflow-x-auto p-6 text-sm leading-7 text-white/80"><code>{isLean ? job.proof.lean : job.proof.latex}</code></pre></div><div className="rounded-2xl border border-black/10 p-6"><div className="flex items-center gap-2 text-sm font-semibold"><IconCheck size={16} /> {job.proof.status === "verified" ? "Lean verified" : "Candidate"}</div><p className="mt-5 text-xs leading-6 text-black/55">{job.proof.checker}</p><p className="mt-5 text-[9px] font-semibold uppercase tracking-[0.16em] text-black/35">Axioms</p><ul className="mt-3 space-y-2 text-xs text-black/55">{job.proof.axioms.map((axiom) => <li key={axiom} className="border-b border-black/8 pb-2">{axiom}</li>)}</ul></div></div>;
+  const source = isLean ? proof.lean : proof.latex;
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([source], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a"); link.href = url; link.download = isLean ? "proof.lean" : "result.tex"; link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  return <div className="overflow-hidden rounded-2xl border border-black/10 bg-white">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/10 px-6 py-4"><span className="flex items-center gap-2 text-xs font-semibold">{isLean ? <IconCode size={16} /> : <IconFileDescription size={16} />}{isLean ? "proof.lean" : "Written result · LaTeX mathematics"}</span><div className="flex gap-4 text-xs">{!isLean && <button onClick={() => setSourceVisible(!sourceVisible)} className="underline underline-offset-4">{sourceVisible ? "Read result" : "View .tex source"}</button>}<button disabled={!source} onClick={download} className="font-semibold disabled:opacity-40">Download {isLean ? ".lean" : ".tex"} ↓</button></div></div>
+    {isLean || sourceVisible ? <pre className="max-h-[48rem] overflow-auto bg-[#101010] p-6 text-sm leading-7 text-white/80"><code>{source || "No source was saved for this episode."}</code></pre> : <article className="literature-markdown mx-auto max-w-3xl p-6 sm:p-10">
+      <h3 className="text-3xl font-semibold tracking-tight">{job.title}</h3>
+      <p className="mt-6 text-[10px] font-semibold uppercase tracking-widest text-black/40">Research question</p>
+      <div className="mt-3 whitespace-pre-wrap text-sm leading-7"><ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{job.statement}</ReactMarkdown></div>
+      <h4 className="mb-4 mt-8 text-lg font-semibold">Proof exposition</h4>
+      {proof.explanation?.trim() ? <div className="space-y-4 text-sm leading-8 text-black/75 [overflow-wrap:anywhere]"><ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{proof.explanation}</ReactMarkdown></div> : <p className="text-sm leading-7 text-black/55">This episode did not save a written proof explanation. {proof.latex?.trim() ? "Use View .tex source to inspect the available document." : "Start a new episode to generate a written proof alongside the Lean artifact."}</p>}
+      <details className="mt-8 border-t border-black/10 pt-5"><summary className="cursor-pointer text-xs font-semibold">Exact formal statement checked by Lean</summary><pre className="mt-3 overflow-auto whitespace-pre-wrap text-xs leading-6">{proof.statement}</pre></details>
+    </article>}
+    <div className="border-t border-black/10 bg-[#fafafa] p-6 text-xs leading-6 text-black/60"><p className="font-semibold text-black">{proof.status === "verified" ? "✓ Lean verification passed" : "Proof is not verified"}</p><p>{proof.checker}</p><p>{job.summary}</p><p className="mt-2">Verification applies to the Lean source; the written exposition is not independently machine-checked.</p>{proof.axioms.length > 0 && <p className="mt-2">Axioms: {proof.axioms.join(", ")}</p>}</div>
+  </div>;
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return <p className="text-[10px] font-medium uppercase tracking-[0.25em] text-black/45">{children}</p>;
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="bg-white p-4"><p className="text-[9px] uppercase tracking-[0.14em] text-black/40">{label}</p><p className="mt-2 text-xl font-semibold tracking-[-0.04em]">{value}</p></div>;
 }

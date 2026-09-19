@@ -2,7 +2,7 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyRequest } from "fastify";
 import { Redis } from "ioredis";
-import { getCollections, getDatabase, getMongoClient } from "@triviality/database";
+import { getCollections, getDatabase, getMongoClient, proofDocument } from "@triviality/database";
 import { catalog, validateRoleModels } from "./models.js";
 import { config } from "./config.js";
 
@@ -76,12 +76,17 @@ async function serializeJob(episodeId: string) {
     };
   });
 
+  // Older episodes retained the writer's explanation inside the result evidence.
+  const savedOutcome = results.map((result) => metadataOf(metadataOf(result.evidence).outcome)).find((outcome) => outcome.proof);
+  const savedExplanation = metadataOf(savedOutcome?.proof).explanation;
+  const explanation = formalization?.explanation ?? (typeof savedExplanation === "string" ? savedExplanation : "");
   const proof = formalization ? {
     status: formalization.verified ? "verified" : "candidate",
     theoremName: formalization.theoremName ?? "research_result",
     statement: formalization.statement ?? "",
     lean: formalization.leanSource ?? "",
-    latex: formalization.latexSource ?? "",
+    explanation,
+    latex: formalization.latexSource?.trim() || proofDocument(episode.title, problem?.statement ?? episode.objective, explanation, `${episode.summary ?? ""}\n\n${formalization.checker ?? "No checker result recorded."}`),
     checker: formalization.checker ?? formalization.verificationLog ?? "No independent checker result recorded.",
     axioms: formalization.axioms ?? [],
   } : undefined;

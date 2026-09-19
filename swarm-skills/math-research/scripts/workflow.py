@@ -103,7 +103,11 @@ async def run(args):
     checked = None
     for attempt in range(attempts):
         draft = await ask(f"Proof writer {attempt + 1}", "Write a Lean 4 proof TERM ONLY (typically by ...), "
-            "with an explanation separately. Import Std is supplied. The theorem signature is fixed; never redefine "
+            "with a self-contained written proof in the explanation field: state the theorem and assumptions, "
+            "define notation, justify each mathematical step, and conclude precisely what was proved. "
+            "Use Markdown prose with $...$ inline and $$...$$ display LaTeX mathematics. "
+            "Explain the mathematics, not just tactic names or that Lean passed. If incomplete, identify the gaps. "
+            "Import Std is supplied. The theorem signature is fixed; never redefine "
             "or weaken it. No comments, declarations, # commands, metaprogramming, sorry, admit, axioms, native_decide, "
             "or set_option. Ordinary tactics such as omega, simp, induction, exact and rfl are allowed.\n"
             + review_context + "\nResearch reports: " + json.dumps(reports) + "\nCritic: " + json.dumps(review)

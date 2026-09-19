@@ -77,6 +77,7 @@ export interface ResearchProof {
   statement: string;
   lean: string;
   latex: string;
+  explanation?: string;
   checker: string;
   axioms: string[];
 }

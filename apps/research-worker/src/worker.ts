@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { createHash, randomUUID } from "node:crypto";
 import { Redis } from "ioredis";
-import { getCollections, getMongoClient } from "@triviality/database";
+import { getCollections, getMongoClient, proofDocument } from "@triviality/database";
 import { config } from "./config.js";
 import { runSwarm } from "./swarm.js";
 
@@ -190,6 +190,8 @@ async function runEpisode(episodeId: string): Promise<void> {
         await collections.formalizations.insertOne({ _id: formalizationId, episodeId, system: "Lean", systemVersion: "4 / Std",
           verified: proof.verified, checker: proof.checker, axioms: proof.axioms, verificationLog: proof.log,
           theoremName: proof.theoremName, statement: proof.statement, leanSource: proof.lean,
+          explanation: proof.explanation,
+          latexSource: proofDocument(episode.title, problem.statement, proof.explanation ?? "", `${outcome.summary}\n\n${proof.checker}`),
           createdAt: now, updatedAt: now });
         await addGraphNode(episodeId, formalizationId, "FORMALIZATION", "Fixed theorem", proof.checker, 50, 65, proof.verified ? "verified" : "candidate");
         for (const hypothesisId of hypothesisIds) await addGraphEdge(episodeId, hypothesisId, formalizationId, "SUPPORTS", "reviewed evidence");
