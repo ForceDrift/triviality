@@ -1,6 +1,4 @@
-import { notFound } from "next/navigation";
-import { getLiteraturePaper } from "@/lib/literature";
-import { LiteratureReader } from "@/components/literature-reader";
+import { notFound, redirect } from "next/navigation";
 
 export default async function LiteraturePaperPage({
   params,
@@ -8,9 +6,6 @@ export default async function LiteraturePaperPage({
   params: Promise<{ paperId: string }>;
 }) {
   const { paperId } = await params;
-  const paper = getLiteraturePaper(paperId);
-
-  if (!paper) notFound();
-
-  return <LiteratureReader paper={paper} />;
+  if (paperId === "compactness-in-finite-graphs") redirect("/dashboard/literature");
+  notFound();
 }

@@ -4,7 +4,7 @@ import type { ResearchLiterature } from "@/lib/research-store";
 
 export function ResearchLiteratureTabs({ jobId, papers }: { jobId: string; papers: ResearchLiterature[] }) {
   if (!papers.length) {
-    return <div className="rounded-2xl border border-dashed border-black/15 p-8 text-sm text-black/45">No literature was attached to this episode.</div>;
+    return <div className="rounded-2xl border border-dashed border-black/15 p-8 text-sm text-black/45">No papers attached.</div>;
   }
 
   return (
@@ -16,7 +16,7 @@ export function ResearchLiteratureTabs({ jobId, papers }: { jobId: string; paper
         <span />
       </div>
 
-      <div className="divide-y divide-black/10" role="list" aria-label="Generated literature">
+      <div className="divide-y divide-black/10" role="list" aria-label="Literature">
         {papers.map((paper, index) => (
           <Link
             className="grid grid-cols-[minmax(0,1fr)_8rem_7rem_2rem] gap-3 px-4 py-4 text-left transition hover:bg-black/[.025] focus-visible:bg-black/[.04] focus-visible:outline-none sm:grid-cols-[minmax(0,1fr)_13rem_10rem_3rem] sm:px-5"

@@ -7,7 +7,7 @@ const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "triviality — mathematical discovery",
-  description: "An engine for exploring the space between mathematical ideas.",
+  description: "Mathematical research, literature, and Lean proof verification.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

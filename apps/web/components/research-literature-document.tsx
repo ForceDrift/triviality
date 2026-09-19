@@ -41,11 +41,11 @@ function paperMarkdown(paper: ResearchLiterature) {
 
 ${paper.summary}
 
-## Why it matters
+## Relevance
 
 ${paper.relevance}
 
-## Research role
+## Source
 
-This paper was selected as a **${paper.discovery === "expanded" ? "graph expansion" : "seed literature"}** result for the episode. Its claims and techniques remain attached to the episode graph so later hypotheses can cite the same evidence.`;
+[${paper.source}](${paper.url})`;
 }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
-import { IconArrowUpRight, IconBook2, IconCopy, IconCheck } from "@tabler/icons-react";
+import { IconArrowUpRight, IconCopy, IconCheck } from "@tabler/icons-react";
 import { TrivialityLogo } from "@/components/triviality-logo";
 import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
 import type { LiteraturePaper } from "@/lib/literature";
@@ -37,7 +37,7 @@ export function LiteratureReader({ paper }: { paper: LiteraturePaper }) {
   }, [sectionIds]);
 
   const copyPage = async () => {
-    const text = [paper.title, paper.subtitle, ...paper.sections.map((section) => `${section.title}\n${section.markdown}`)].join("\n\n");
+    const text = [paper.title, ...paper.sections.map((section) => `${section.title}\n${section.markdown}`)].join("\n\n");
     await navigator.clipboard.writeText(text);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
@@ -47,27 +47,22 @@ export function LiteratureReader({ paper }: { paper: LiteraturePaper }) {
     <main className="min-h-screen bg-white text-[#171717]">
       <ReaderNav />
 
-      <div className="mx-auto max-w-[1440px] px-5 pb-24 pt-12 sm:px-10 lg:px-16 lg:pt-20">
-        <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,1fr)_220px] lg:gap-16 xl:grid-cols-[220px_minmax(0,1fr)_220px] xl:gap-16">
-          <BlogSidebar paper={paper} />
+      <div className="mx-auto max-w-[1200px] px-5 pb-16 pt-8 sm:px-10 lg:px-16 lg:pt-12">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,1fr)_220px] lg:gap-16">
           <article className="min-w-0">
-            <header className="mx-auto max-w-[920px] text-center">
-              <div className="flex items-center justify-center gap-3 text-sm font-medium text-black/60 sm:text-base">
-                <time dateTime="2026-09-19">{paper.date}</time>
+            <header className="mx-auto max-w-[820px]">
+              <div className="flex items-center gap-3 text-sm font-medium text-black/60 sm:text-base">
+                <time>{paper.date}</time>
                 <span className="text-black/20">·</span>
                 <span>{paper.category}</span>
               </div>
-              <h1 className="mt-7 text-4xl font-semibold leading-[1.04] tracking-[-0.06em] sm:text-6xl lg:text-[72px]">{paper.title}</h1>
-              <div className="mx-auto mt-5 max-w-3xl text-xs leading-5 text-black/50 sm:text-sm sm:leading-6"><ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={{ p: ({ children }) => <p className="m-0">{children}</p> }}>{paper.subtitle}</ReactMarkdown></div>
-              <p className="mt-5 text-xs text-black/55">Author: <span className="text-black/75">{paper.authors}</span></p>
+              <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.04em] sm:text-4xl">{paper.title}</h1>
+              <p className="mt-5 text-xs text-black/55"><span className="text-black/75">{paper.authors}</span></p>
             </header>
-
-            <PaperHero />
 
             <div className="mx-auto mt-12 max-w-[820px] text-left">
               {paper.sections.map((section) => (
                 <section className="literature-section scroll-mt-28" id={section.id} key={section.id}>
-                  <h2 className="sr-only">{section.title}</h2>
                   <ReactMarkdown
                     remarkPlugins={[remarkMath]}
                     rehypePlugins={[rehypeKatex]}
@@ -106,7 +101,6 @@ export function LiteratureReader({ paper }: { paper: LiteraturePaper }) {
         </div>
       </div>
 
-      <div className="fixed bottom-5 right-5 hidden rounded-full bg-black px-5 py-3 text-sm font-medium text-white shadow-lg sm:block">Ask AI</div>
     </main>
   );
 }
@@ -119,7 +113,7 @@ function ReaderNav() {
         <div className="hidden items-center gap-8 text-[15px] text-black/75 md:flex">
           <Link href="/">Home</Link>
           <Link href="/dashboard">Research</Link>
-          <Link className="text-black" href="/literature">Literature</Link>
+          <Link className="text-black" href="/dashboard/literature">Literature</Link>
           <Link href="/dashboard/graph">Graph</Link>
         </div>
         <div className="flex items-center gap-3">
@@ -127,47 +121,5 @@ function ReaderNav() {
         </div>
       </div>
     </nav>
-  );
-}
-
-function BlogSidebar({ paper }: { paper: LiteraturePaper }) {
-  return (
-    <aside className="hidden xl:block">
-      <div className="sticky top-28 pr-5 text-[15px] leading-6 text-black/75">
-        <p className="font-medium text-black">All posts</p>
-        <p className="mt-12 font-semibold text-black">Recent</p>
-        <nav className="mt-4 grid gap-1" aria-label="Recent literature">
-          <Link className="rounded-xl bg-black/[.07] px-3 py-3 font-medium text-black" href={paper.href ?? `/literature/${paper.id}`}>{paper.title}</Link>
-          <Link className="rounded-xl px-3 py-3 transition hover:bg-black/[.04]" href="/literature/compactness-in-finite-graphs">Structural invariants in graph transformations</Link>
-          <Link className="rounded-xl px-3 py-3 transition hover:bg-black/[.04]" href="/literature/compactness-in-finite-graphs">Proof search and finite witnesses</Link>
-          <Link className="rounded-xl px-3 py-3 transition hover:bg-black/[.04]" href="/literature/compactness-in-finite-graphs">Formalizing research notes</Link>
-        </nav>
-        <p className="mt-12 font-semibold text-black">Topics</p>
-        <nav className="mt-4 grid gap-1" aria-label="Literature topics">
-          {['Research runtime', 'Proof systems', 'Combinatorics', 'Formal methods', 'Lean'].map((topic) => <Link className="rounded-xl px-3 py-2 transition hover:bg-black/[.04]" href="/literature" key={topic}>{topic}</Link>)}
-        </nav>
-      </div>
-    </aside>
-  );
-}
-
-function PaperHero() {
-  return (
-    <div className="relative mx-auto mt-14 flex aspect-[2.6/1] max-w-[1100px] items-center justify-center overflow-hidden rounded-2xl bg-[#2377ee]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_8%_5%,rgba(255,187,160,.9),transparent_22%),radial-gradient(circle_at_58%_25%,rgba(255,255,255,.5),transparent_25%),radial-gradient(circle_at_92%_80%,rgba(244,182,220,.65),transparent_34%),linear-gradient(125deg,#2374e7,#4b9cf4_53%,#3175e7)]" />
-      <div className="absolute inset-0 opacity-25 [background-image:radial-gradient(rgba(255,255,255,.9)_1px,transparent_1px)] [background-size:10px_10px]" />
-      <div className="absolute h-[76%] w-[38%] rounded-full border border-white/25" />
-      <div className="relative flex h-36 w-48 items-center justify-center rounded-2xl border border-white/60 bg-white/15 shadow-[0_24px_80px_rgba(0,34,120,.28)] backdrop-blur-sm sm:h-48 sm:w-64">
-        <div className="absolute -top-5 rounded-full border border-white/70 bg-white/15 px-5 py-2 text-sm font-medium text-white backdrop-blur-sm"><IconBook2 className="mr-2 inline" size={17} />Reading notes</div>
-        <div className="grid gap-3 opacity-80">
-          <span className="h-1.5 w-28 rounded-full bg-white/80 sm:w-40" />
-          <span className="h-1.5 w-36 rounded-full bg-white/65 sm:w-48" />
-          <span className="h-1.5 w-24 rounded-full bg-white/80 sm:w-32" />
-          <span className="h-1.5 w-32 rounded-full bg-white/65 sm:w-44" />
-          <span className="h-1.5 w-20 rounded-full bg-white/80 sm:w-28" />
-        </div>
-        <span className="absolute -bottom-3 rounded-full border border-white/60 bg-white/80 px-4 py-1.5 text-xs font-medium tracking-[0.12em] text-black/60">FORMAL NOTE</span>
-      </div>
-    </div>
   );
 }
