@@ -6,6 +6,8 @@ export async function ensureIndexes(): Promise<void> {
     collections.papers.createIndex({ externalId: 1 }, { unique: true }),
     collections.sources.createIndex({ provider: 1, externalId: 1 }, { unique: true }),
     collections.paperSources.createIndex({ paperId: 1, sourceId: 1 }, { unique: true }),
+    collections.paperDiscoveries.createIndex({ paperId: 1, area: 1 }, { unique: true }),
+    collections.paperDiscoveries.createIndex({ area: 1, rank: 1 }),
     collections.paperEmbeddings.createIndex({ paperId: 1, model: 1 }, { unique: true }),
     collections.paperNodes.createIndex({ "source.paper_id": 1, type: 1 }),
     collections.graphNodes.createIndex({ entityType: 1, entityId: 1 }, { unique: true }),

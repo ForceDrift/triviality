@@ -18,3 +18,5 @@ Convenience commands are also available: `pnpm db:up`, `pnpm db:status`, and `pn
 The local database is available at `mongodb://localhost:27017`, database `triviality`. Atlas can be used later by replacing `MONGODB_URI` in `.env`.
 
 The paper ingestion worker ranks mathematics-related OpenAlex works by citation count, stores normalized metadata and raw JSON artifacts, creates paper graph nodes, and writes embeddings when `EMBEDDING_API_KEY` is configured. OpenAlex is used for ranked discovery; arXiv/PDF URLs are retained as source links when supplied by the record.
+
+The default discovery catalog covers 16 areas and requests up to 100 works per area: algebra, analysis, geometry, topology, number theory, combinatorics, probability, statistics, logic, differential equations, numerical analysis, optimization, dynamical systems, mathematical physics, category theory, and representation theory. Results are deduplicated by OpenAlex work ID; per-area rank and provenance are stored in `paper_discoveries`.

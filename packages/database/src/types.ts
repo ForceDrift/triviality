@@ -45,6 +45,7 @@ export interface FormalizationDocument extends BaseDocument { attemptId?: string
 
 export interface SourceDocument extends BaseDocument { provider: SourceProvider; externalId: string; canonicalUrl: string; metadata?: unknown; }
 export interface PaperSourceDocument extends BaseDocument { paperId: string; sourceId: string; rank?: number; retrievedAt: Date; }
+export interface PaperDiscoveryDocument extends BaseDocument { paperId: string; provider: SourceProvider; area: string; areaLabel: string; rank: number; retrievedAt: Date; }
 export interface ObjectArtifactDocument extends BaseDocument { bucket: string; storageKey: string; kind: ArtifactKind; mimeType?: string; byteSize?: number; checksum?: string; paperId?: string; metadata?: unknown; }
 export interface PaperEmbeddingDocument extends BaseDocument { paperId: string; model: string; dimensions: number; embedding: number[]; }
 export type PaperNodeType = "theorem" | "lemma" | "definition" | "conjecture" | "technique" | "proof_strategy" | "mathematical_structure" | "counterexample" | "failure" | "formalization";

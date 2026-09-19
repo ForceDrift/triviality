@@ -3,7 +3,7 @@ import { Collection, Db, MongoClient } from "mongodb";
 import type {
   ConjectureDocument, CounterexampleDocument, DefinitionDocument, FailureDocument, FormalizationDocument,
   GraphNodeDocument, GraphRelationshipDocument, LemmaDocument, MathematicalStructureDocument, ObjectArtifactDocument,
-  PaperDocument, PaperEmbeddingDocument, PaperKnowledgeNodeDocument, PaperSourceDocument, ProofStrategyDocument, ResearchAttemptDocument,
+  PaperDiscoveryDocument, PaperDocument, PaperEmbeddingDocument, PaperKnowledgeNodeDocument, PaperSourceDocument, ProofStrategyDocument, ResearchAttemptDocument,
   ResearchEpisodeDocument, ResearchHypothesisDocument, ResearchProblemDocument, ResearchProjectDocument, ResearchResultDocument,
   SourceDocument, TechniqueDocument, TheoremDocument,
 } from "./types.js";
@@ -47,6 +47,7 @@ export interface DatabaseCollections {
   formalizations: Collection<FormalizationDocument>;
   sources: Collection<SourceDocument>;
   paperSources: Collection<PaperSourceDocument>;
+  paperDiscoveries: Collection<PaperDiscoveryDocument>;
   objectArtifacts: Collection<ObjectArtifactDocument>;
   paperEmbeddings: Collection<PaperEmbeddingDocument>;
   paperNodes: Collection<PaperKnowledgeNodeDocument>;
@@ -64,7 +65,7 @@ export async function getCollections(): Promise<DatabaseCollections> {
     definitions: db.collection("definitions"), conjectures: db.collection("conjectures"), techniques: db.collection("techniques"),
     proofStrategies: db.collection("proof_strategies"), mathematicalStructures: db.collection("mathematical_structures"),
     counterexamples: db.collection("counterexamples"), failures: db.collection("failures"), formalizations: db.collection("formalizations"),
-    sources: db.collection("sources"), paperSources: db.collection("paper_sources"), objectArtifacts: db.collection("object_artifacts"),
+    sources: db.collection("sources"), paperSources: db.collection("paper_sources"), paperDiscoveries: db.collection("paper_discoveries"), objectArtifacts: db.collection("object_artifacts"),
     paperEmbeddings: db.collection("paper_embeddings"), paperNodes: db.collection("paper_nodes"), graphNodes: db.collection("graph_nodes"), graphRelationships: db.collection("graph_relationships"),
   };
 }
