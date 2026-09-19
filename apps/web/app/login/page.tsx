@@ -14,18 +14,21 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-white px-6 py-12 text-[#111]">
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-md">
         <div className="mb-10 text-center">
-          <TrivialityLogo />
-          <h1 className="mt-10 text-2xl font-semibold tracking-tight">
-            Welcome back
+          <div className="flex justify-center">
+            <TrivialityLogo wordmark={false} className="scale-125" />
+          </div>
+          <h1 className="mt-10 text-3xl font-semibold tracking-[-0.04em]">
+            Sign in to Triviality
           </h1>
           <p className="mt-2 text-sm text-black/55">
-            Enter your details to continue exploring.
+            Enter your details to continue.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="rounded-xl border border-black/15 bg-white p-10 shadow-sm sm:p-12">
+          <form onSubmit={handleSubmit} className="space-y-7">
           <div className="space-y-2">
             <label htmlFor="email" className="text-xs font-medium uppercase tracking-[0.16em]">
               Email
@@ -77,7 +80,8 @@ export default function LoginPage() {
           >
             GitHub
           </button>
-        </form>
+          </form>
+        </div>
 
         <p className="mt-8 text-center text-xs leading-5 text-black/45">
           This is a demo login. Any credentials will work.
