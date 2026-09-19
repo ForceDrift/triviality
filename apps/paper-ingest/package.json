@@ -1,22 +1,19 @@
 {
-  "name": "@triviality/database",
+  "name": "@triviality/paper-ingest",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "ingest": "tsx src/index.ts --once",
+    "start": "tsx src/index.ts",
     "build": "tsc --outDir dist",
-    "typecheck": "tsc --noEmit",
-    "ensure-indexes": "tsx src/ensure-indexes.ts"
-  },
-  "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "import": "./dist/index.js"
-    }
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@triviality/database": "workspace:*",
     "dotenv": "^16.4.7",
-    "mongodb": "^6.17.0"
+    "ioredis": "^5.6.1"
   },
   "devDependencies": {
     "@types/node": "^20",

@@ -1,0 +1,19 @@
+services:
+  mongodb:
+    image: mongo:8.0
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: triviality
+    volumes:
+      - triviality-mongodb:/data/db
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - triviality-redis:/data
+
+volumes:
+  triviality-mongodb:
+  triviality-redis:

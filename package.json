@@ -5,7 +5,13 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "db:up": "docker compose up -d mongodb redis",
+    "db:down": "docker compose down",
+    "db:status": "docker compose ps",
+    "db:ensure-indexes": "pnpm --filter @triviality/database ensure-indexes",
+    "papers:ingest": "pnpm --filter @triviality/paper-ingest ingest",
+    "papers:api": "pnpm --filter @triviality/api-papers dev"
   },
   "devDependencies": {
     "turbo": "^2.5.0"
