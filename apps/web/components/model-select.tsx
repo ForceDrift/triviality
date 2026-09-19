@@ -5,19 +5,34 @@ import { Select } from "@base-ui/react/select";
 import { IconCheck, IconChevronDown } from "@tabler/icons-react";
 import { modelCatalog } from "@/lib/research-store";
 
-const brands: Record<string, { name: string; logo: string }> = {
-  openai: { name: "OpenAI", logo: "https://models.dev/logos/openai.svg" },
-  gemini: { name: "Google", logo: "https://models.dev/logos/google.svg" },
-  deepseek: { name: "DeepSeek", logo: "https://models.dev/logos/deepseek.svg" },
-  qwen: { name: "Alibaba", logo: "https://models.dev/logos/alibaba.svg" },
-  devin: { name: "Devin", logo: "https://devin.ai/favicon.ico" },
+const brands: Record<string, { name: string; logo: string; maskColor?: string }> = {
+  // Color variants from the public AI Icons repository; OpenAI's currentColor mark is tinted with its brand purple.
+  openai: { name: "OpenAI", logo: "https://raw.githubusercontent.com/gokuscraper/ai-icons/main/svgs/openai.svg", maskColor: "#412991" },
+  gemini: { name: "Google", logo: "https://raw.githubusercontent.com/gokuscraper/ai-icons/main/svgs/gemini-color.svg" },
+  deepseek: { name: "DeepSeek", logo: "https://raw.githubusercontent.com/gokuscraper/ai-icons/main/svgs/deepseek-color.svg" },
+  qwen: { name: "Alibaba", logo: "https://raw.githubusercontent.com/gokuscraper/ai-icons/main/svgs/qwen-color.svg" },
+  devin: { name: "Devin", logo: "https://raw.githubusercontent.com/gokuscraper/ai-icons/main/svgs/devin-color.svg" },
 };
 
 function ProviderLogo({ provider }: { provider: string }) {
   const [failed, setFailed] = useState(false);
   const brand = brands[provider];
   return <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-black/8 bg-white">
-    {failed || !brand ? <span className="text-xs font-semibold">{brand?.name.slice(0, 1) ?? "M"}</span> :
+    {failed || !brand ? <span className="text-xs font-semibold">{brand?.name.slice(0, 1) ?? "M"}</span> : brand.maskColor ?
+      <span
+        className="h-5 w-5"
+        style={{
+          backgroundColor: brand.maskColor,
+          maskImage: `url(${brand.logo})`,
+          maskPosition: "center",
+          maskRepeat: "no-repeat",
+          maskSize: "contain",
+          WebkitMaskImage: `url(${brand.logo})`,
+          WebkitMaskPosition: "center",
+          WebkitMaskRepeat: "no-repeat",
+          WebkitMaskSize: "contain",
+        }}
+      /> :
       // Provider brand assets; fall back to an initial if the image is unavailable.
       // eslint-disable-next-line @next/next/no-img-element
       <img src={brand.logo} alt="" className="h-5 w-5 object-contain" onError={() => setFailed(true)} />}
