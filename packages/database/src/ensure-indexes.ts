@@ -1,8 +1,17 @@
-import { getCollections, getDatabase } from "./client.js";
+import { getCollections, getDatabase, getMongoClient } from "./client.js";
 
 export async function ensureIndexes(): Promise<void> {
   const collections = await getCollections();
   await Promise.all([
+    collections.researchEpisodes.createIndex({ projectId: 1, createdAt: -1 }),
+    collections.researchProblems.createIndex({ episodeId: 1 }),
+    collections.researchHypotheses.createIndex({ episodeId: 1, createdAt: 1 }),
+    collections.researchAttempts.createIndex({ episodeId: 1, createdAt: 1 }),
+    collections.researchResults.createIndex({ episodeId: 1, createdAt: 1 }),
+    collections.researchEvents.createIndex({ episodeId: 1, createdAt: 1 }),
+    collections.formalizations.createIndex({ episodeId: 1 }),
+    collections.papers.createIndex({ "rawMetadata.episodeId": 1, createdAt: 1 }),
+    collections.papers.createIndex({ "rawMetadata.episodeIds": 1, createdAt: 1 }),
     collections.papers.createIndex({ externalId: 1 }, { unique: true }),
     collections.sources.createIndex({ provider: 1, externalId: 1 }, { unique: true }),
     collections.paperSources.createIndex({ paperId: 1, sourceId: 1 }, { unique: true }),
@@ -11,7 +20,9 @@ export async function ensureIndexes(): Promise<void> {
     collections.paperEmbeddings.createIndex({ paperId: 1, model: 1 }, { unique: true }),
     collections.paperNodes.createIndex({ "source.paper_id": 1, type: 1 }),
     collections.graphNodes.createIndex({ entityType: 1, entityId: 1 }, { unique: true }),
+    collections.graphNodes.createIndex({ "metadata.episodeIds": 1, createdAt: 1 }),
     collections.graphRelationships.createIndex({ fromNodeId: 1, toNodeId: 1, type: 1 }, { unique: true }),
+    collections.graphRelationships.createIndex({ "metadata.episodeIds": 1, createdAt: 1 }),
     collections.papers.createIndex({ citedByCount: -1 }),
   ]);
 
@@ -43,4 +54,5 @@ export async function ensureIndexes(): Promise<void> {
 if (process.argv[1]?.endsWith("ensure-indexes.ts")) {
   await ensureIndexes();
   console.log("MongoDB indexes ensured");
+  await (await getMongoClient()).close();
 }
