@@ -1,5 +1,5 @@
 export type ResearchJobStatus = "running" | "completed" | "failed";
-export type ResearchProvider = "openai" | "devin" | "huawei";
+export type ResearchProvider = "openai" | "devin" | "huawei" | "baseten";
 
 export type ResearchNodeType = "problem" | "hypothesis" | "paper" | "lemma" | "proof" | "result";
 

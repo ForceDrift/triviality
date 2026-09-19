@@ -14,6 +14,7 @@ const providers: Array<{ id: ResearchProvider; name: string; description: string
   { id: "openai", name: "OpenAI", description: "Hypotheses, synthesis, and formalization.", logo: "https://models.dev/logos/openai.svg" },
   { id: "devin", name: "Devin", description: "Autonomous research agents and critique.", logo: "https://devin.ai/favicon.ico" },
   { id: "huawei", name: "Huawei", description: "Huawei model and infrastructure research route.", logo: "https://www.huawei.com/favicon.ico" },
+  { id: "baseten", name: "Baseten", description: "Production inference and model deployment.", logo: "https://www.baseten.co/favicon.ico" },
 ];
 
 type ResearchForm = {
@@ -163,6 +164,15 @@ function ResearchDeployModal({
               <IconChevronUp size={19} />
             </div>
 
+            <div className="mt-4 flex items-center justify-between gap-4 rounded-md border border-black bg-[#fafafa] px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/45">Research workload</p>
+                <p className="mt-1 text-base font-medium tracking-[-0.03em]">Math Annotator</p>
+                <p className="mt-0.5 truncate text-xs text-black/50">Explore mathematical spaces, annotate literature, and generate candidate ideas.</p>
+              </div>
+              <span className="shrink-0 rounded-md bg-black px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white">Selected</span>
+            </div>
+
             <div className="mt-4 flex flex-col gap-2.5 lg:flex-row">
               <label className="relative min-w-0 flex-1">
                 <span className="sr-only">Search model providers</span>
@@ -194,7 +204,6 @@ function ResearchDeployModal({
               <label className="grid gap-1.5 text-sm font-medium">Research space<textarea required className="min-h-24 resize-y rounded-md border border-black/12 bg-white px-3.5 py-2.5 text-sm font-normal leading-6 outline-none transition focus:border-black/45" placeholder="Describe the mathematical space agents should explore and connect." value={form.statement} onChange={(event) => setForm((current) => ({ ...current, statement: event.target.value }))} /><span className="text-xs font-normal leading-5 text-black/45">Agents will scan the space, generate competing ideas, and test promising directions.</span></label>
             </div>
             <div className="grid content-start gap-4">
-              <FieldSelect label="Model provider" value={form.provider} onChange={(value) => setForm((current) => ({ ...current, provider: value as ResearchProvider }))} options={providers.map((provider) => provider.id)} displayOptions={providers.map((provider) => ({ value: provider.id, label: provider.name }))} />
               <FieldSelect label="Area" value={form.area} onChange={(value) => setForm((current) => ({ ...current, area: value }))} options={["Algebra", "Analysis", "Combinatorics", "Geometry", "Logic", "Number theory", "Topology"]} />
               <FieldSelect label="Search mode" value={form.mode} onChange={(value) => setForm((current) => ({ ...current, mode: value }))} options={["Diverse portfolio", "Proof first", "Counterexample hunt", "Cross-domain transfer"]} />
               <label className="grid gap-1.5 text-sm font-medium">Attempt budget<input className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm font-normal outline-none" min={1} max={30} type="number" value={form.budget} onChange={(event) => setForm((current) => ({ ...current, budget: Number(event.target.value) }))} /></label>
