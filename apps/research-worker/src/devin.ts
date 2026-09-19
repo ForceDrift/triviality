@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { getCollections, getDatabase } from "@triviality/database";
+import { getCollections } from "@triviality/database";
 import { config } from "./config.js";
 
 type DevinSession = {
@@ -83,7 +83,7 @@ async function getMessages(organizationId: string, sessionId: string): Promise<s
 }
 
 function roles(title: string, statement: string, literature: string[], episodeId: string): DevinRole[] {
-  const context = `Research target: ${title}\nProblem statement: ${statement}\nEpisode id: ${episodeId}\nLiterature retrieved by Triviality:\n${literature.join("\n") || "No literature was retrieved."}`;
+  const context = `Research space: ${title}\nExploration brief: ${statement}\nEpisode id: ${episodeId}\nLiterature retrieved by Triviality:\n${literature.join("\n") || "No literature was retrieved."}`;
   return [
     {
       name: "Literature scout",
@@ -109,9 +109,8 @@ async function recordAttempt(episodeId: string, attemptId: string, update: Recor
 }
 
 async function emit(episodeId: string, type: string, payload: Record<string, unknown>): Promise<void> {
-  const database = await getDatabase();
-  const events = database.collection<{ _id: string; episodeId: string; type: string; payload: Record<string, unknown>; createdAt: Date }>("research_events");
-  await events.insertOne({ _id: id("event"), episodeId, type, payload, createdAt: new Date() });
+  const collections = await getCollections();
+  await collections.researchEvents.insertOne({ _id: id("event"), episodeId, type, payload, createdAt: new Date(), updatedAt: new Date() });
 }
 
 async function monitorSession(organizationId: string, episodeId: string, attemptId: string, sessionId: string): Promise<void> {

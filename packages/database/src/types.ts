@@ -44,6 +44,7 @@ export interface ResearchProblemDocument extends BaseDocument { episodeId: strin
 export interface ResearchHypothesisDocument extends BaseDocument { episodeId: string; problemId?: string; statement: string; rationale: string; assumptions?: unknown; expectedConsequences?: unknown; noveltyEstimate?: number; plausibilityEstimate?: number; formalizability?: number; status: ResearchStatus; }
 export interface ResearchAttemptDocument extends BaseDocument { episodeId: string; hypothesisId: string; proofStrategyId?: string; strategy: string; status: AttemptStatus; input?: unknown; proofState?: string; error?: string; startedAt?: Date; completedAt?: Date; }
 export interface ResearchResultDocument extends BaseDocument { episodeId: string; hypothesisId?: string; attemptId?: string; title: string; summary: string; status: ResultStatus; evidence?: unknown; }
+export interface ResearchEventDocument extends BaseDocument { episodeId: string; type: string; payload: Record<string, unknown>; }
 
 export interface PaperDocument extends BaseDocument { externalId: string; title: string; abstract?: string; doi?: string; authors?: string[]; subjects: string[]; publishedAt?: Date; citedByCount: number; relevanceScore?: number; landingUrl?: string; openAccessUrl?: string; rawMetadata?: unknown; }
 export interface TheoremDocument extends BaseDocument { paperId?: string; name: string; statement: string; assumptions?: unknown; }

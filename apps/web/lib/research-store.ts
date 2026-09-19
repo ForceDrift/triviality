@@ -27,6 +27,8 @@ export interface ResearchLiterature {
   year: string;
   summary: string;
   relevance: string;
+  discovery?: "seed" | "expanded" | string;
+  matchedQuery?: string;
   url: string;
 }
 
@@ -47,6 +49,23 @@ export interface ResearchAttempt {
   result: string;
 }
 
+export interface ResearchResult {
+  id: string;
+  hypothesisId?: string;
+  attemptId?: string;
+  title: string;
+  summary: string;
+  status: string;
+  evidence?: unknown;
+}
+
+export interface ResearchEvent {
+  id: string;
+  type: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
 export interface ResearchProof {
   status: "verified" | "candidate";
   theoremName: string;
@@ -59,11 +78,15 @@ export interface ResearchProof {
 
 export interface ResearchJob {
   id: string;
+  projectId?: string;
+  problemId?: string;
   title: string;
   statement: string;
+  researchSpace?: { name: string; statement: string; assumptions?: unknown };
   area: string;
   provider: ResearchProvider;
   mode: string;
+  configuration?: { provider: ResearchProvider; mode: string; budget: number };
   budget: number;
   status: ResearchJobStatus;
   stage: string;
@@ -78,6 +101,8 @@ export interface ResearchJob {
   hypotheses: ResearchHypothesis[];
   attempts: ResearchAttempt[];
   proof?: ResearchProof;
+  results?: ResearchResult[];
+  events?: ResearchEvent[];
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

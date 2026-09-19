@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "pnpm --filter @triviality/database build",
     "dev": "tsx watch src/worker.ts",
     "start": "node dist/worker.js",
     "build": "tsc --outDir dist",

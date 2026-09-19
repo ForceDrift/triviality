@@ -7,7 +7,7 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { Redis } from "ioredis";
 import OpenAI from "openai";
-import { getCollections, getDatabase, getMongoClient } from "@triviality/database";
+import { getCollections, getMongoClient } from "@triviality/database";
 import { config } from "./config.js";
 import { spawnDevinResearchAgents } from "./devin.js";
 
@@ -27,6 +27,11 @@ type OpenAlexWork = {
   open_access?: { oa_url?: string | null } | null;
 };
 
+type LiteratureHit = OpenAlexWork & {
+  discovery: "seed" | "expanded";
+  matchedQuery: string;
+};
+
 function id(prefix: string): string {
   return `${prefix}_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
 }
@@ -43,9 +48,8 @@ function abstractFromIndex(index: OpenAlexWork["abstract_inverted_index"]): stri
 }
 
 async function emit(episodeId: string, type: string, payload: Record<string, unknown>): Promise<void> {
-  const database = await getDatabase();
-  const events = database.collection<{ _id: string; episodeId: string; type: string; payload: Record<string, unknown>; createdAt: Date }>("research_events");
-  await events.insertOne({ _id: id("event"), episodeId, type, payload, createdAt: new Date() });
+  const collections = await getCollections();
+  await collections.researchEvents.insertOne({ _id: id("event"), episodeId, type, payload, createdAt: new Date(), updatedAt: new Date() });
 }
 
 async function updateStage(episodeId: string, stage: string, progress: number): Promise<void> {
@@ -56,32 +60,61 @@ async function updateStage(episodeId: string, stage: string, progress: number): 
 
 async function addGraphNode(episodeId: string, entityId: string, entityType: string, label: string, detail: string, x: number, y: number, status: string): Promise<void> {
   const collections = await getCollections();
+  const existing = await collections.graphNodes.findOne({ entityType: entityType as never, entityId });
+  const existingMetadata = metadata(existing?.metadata);
+  const existingEpisodeIds = Array.isArray(existingMetadata.episodeIds) ? existingMetadata.episodeIds.filter((value): value is string => typeof value === "string") : [];
+  const episodeIds = Array.from(new Set([...existingEpisodeIds, typeof existingMetadata.episodeId === "string" ? existingMetadata.episodeId : undefined, episodeId].filter((value): value is string => Boolean(value))));
   await collections.graphNodes.updateOne(
     { entityType: entityType as never, entityId },
-    { $set: { label, metadata: { episodeId, type: entityType.toLowerCase().replace("research_", ""), detail, x, y, status }, updatedAt: new Date() }, $setOnInsert: { _id: id("graph"), createdAt: new Date() } },
+    { $set: { label, metadata: { ...existingMetadata, episodeId, episodeIds, type: entityType.toLowerCase().replace("research_", ""), detail, x, y, status }, updatedAt: new Date() }, $setOnInsert: { _id: id("graph"), createdAt: new Date() } },
     { upsert: true },
   );
 }
 
 async function addGraphEdge(episodeId: string, source: string, target: string, type: string, label: string): Promise<void> {
   const collections = await getCollections();
+  const existing = await collections.graphRelationships.findOne({ fromNodeId: source, toNodeId: target, type: type as never });
+  const existingMetadata = metadata(existing?.metadata);
+  const existingEpisodeIds = Array.isArray(existingMetadata.episodeIds) ? existingMetadata.episodeIds.filter((value): value is string => typeof value === "string") : [];
+  const episodeIds = Array.from(new Set([...existingEpisodeIds, typeof existingMetadata.episodeId === "string" ? existingMetadata.episodeId : undefined, episodeId].filter((value): value is string => Boolean(value))));
   await collections.graphRelationships.updateOne(
     { fromNodeId: source, toNodeId: target, type: type as never },
-    { $set: { confidence: 0.8, rationale: label, metadata: { episodeId, label }, updatedAt: new Date() }, $setOnInsert: { _id: id("edge"), createdAt: new Date() } },
+    { $set: { confidence: 0.8, rationale: label, metadata: { ...existingMetadata, episodeId, episodeIds, label }, updatedAt: new Date() }, $setOnInsert: { _id: id("edge"), createdAt: new Date() } },
     { upsert: true },
   );
 }
 
-async function fetchLiterature(title: string, statement: string): Promise<OpenAlexWork[]> {
-  const query = `${title} ${statement}`.replace(/[?*]/g, " ").slice(0, 450);
+async function fetchOpenAlex(query: string, perPage: number): Promise<OpenAlexWork[]> {
   const url = new URL("https://api.openalex.org/works");
-  url.searchParams.set("search", query);
+  url.searchParams.set("search", query.replace(/[?*]/g, " ").slice(0, 450));
   url.searchParams.set("sort", "relevance_score:desc");
-  url.searchParams.set("per-page", "5");
+  url.searchParams.set("per-page", String(perPage));
   const response = await fetch(url);
   if (!response.ok) throw new Error(`OpenAlex request failed: ${response.status} ${response.statusText}`);
   const payload = await response.json() as { results?: OpenAlexWork[] };
   return (payload.results ?? []).filter((work) => work.title);
+}
+
+async function fetchLiterature(title: string, statement: string, area: string): Promise<LiteratureHit[]> {
+  const seedQuery = `${area} ${title} ${statement}`;
+  const seedWorks = await fetchOpenAlex(seedQuery, 8);
+  const expansionQueries = Array.from(new Set([
+    `${area} ${title}`,
+    `${area} ${statement}`,
+    ...seedWorks.slice(0, 3).map((work) => work.title ?? ""),
+  ].map((query) => query.trim()).filter(Boolean))).slice(0, 5);
+  const expandedBatches = await Promise.all(expansionQueries.map((query) => fetchOpenAlex(query, 4)));
+  const hits = new Map<string, LiteratureHit>();
+
+  for (const work of seedWorks) {
+    hits.set(work.id, { ...work, discovery: "seed", matchedQuery: seedQuery });
+  }
+  for (let index = 0; index < expandedBatches.length; index += 1) {
+    for (const work of expandedBatches[index]) {
+      if (!hits.has(work.id)) hits.set(work.id, { ...work, discovery: "expanded", matchedQuery: expansionQueries[index] });
+    }
+  }
+  return [...hits.values()].slice(0, 24);
 }
 
 async function synthesizeHypotheses(title: string, statement: string, literature: OpenAlexWork[]) {
@@ -93,7 +126,7 @@ async function synthesizeHypotheses(title: string, statement: string, literature
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: "You are a mathematical research director. Generate competing, falsifiable directions. Do not claim the target is solved. Return JSON only: {\"hypotheses\":[{\"title\":string,\"statement\":string,\"approach\":string,\"rationale\":string,\"plausibility\":number}]}" },
-      { role: "user", content: `Target: ${title}\nProblem: ${statement}\nRelevant literature:\n${sources || "No sources were retrieved."}\nGenerate 2 to 4 materially different hypotheses. Each must identify a mechanism and a concrete proof or counterexample direction.` },
+      { role: "user", content: `Research space: ${title}\nExploration brief: ${statement}\nRelevant literature:\n${sources || "No sources were retrieved."}\nGenerate 2 to 4 materially different research ideas. Each must identify a mechanism and a concrete proof or counterexample direction.` },
     ],
   });
   const content = response.choices[0]?.message.content ?? "{}";
@@ -157,16 +190,27 @@ async function runEpisode(episodeId: string): Promise<void> {
   const problem = await collections.researchProblems.findOne({ episodeId });
   if (!episode || !problem || episode.status !== "ACTIVE") return;
   try {
-    await addGraphNode(episodeId, problem._id, "RESEARCH_PROBLEM", "Target problem", episode.title, 50, 13, "active");
-    await updateStage(episodeId, "Scanning OpenAlex literature", 18);
-    const works = await fetchLiterature(episode.title, problem.statement);
+    await addGraphNode(episodeId, problem._id, "RESEARCH_PROBLEM", "Research space", `${episode.area ?? "Mathematics"} · ${episode.title}`, 50, 13, "active");
+    await updateStage(episodeId, "Finding seed literature for the research space", 14);
+    const works = await fetchLiterature(episode.title, problem.statement, episode.area ?? "Mathematics");
+    await emit(episodeId, "research.literature.expanded", {
+      seedCount: works.filter((work) => work.discovery === "seed").length,
+      expandedCount: works.filter((work) => work.discovery === "expanded").length,
+      totalCount: works.length,
+    });
+    await updateStage(episodeId, "Expanding the literature graph", 24);
     const paperIds: string[] = [];
-    for (const work of works) {
+    for (const [index, work] of works.entries()) {
       const paperId = `paper_${createHash("sha1").update(work.id).digest("hex").slice(0, 16)}`;
       paperIds.push(paperId);
       const now = new Date();
-      await collections.papers.updateOne({ _id: paperId }, { $set: { externalId: work.id, title: work.title ?? "Untitled paper", abstract: abstractFromIndex(work.abstract_inverted_index) ?? undefined, authors: (work.authorships ?? []).map((author) => author.author?.display_name ?? "").filter(Boolean), subjects: [episode.area ?? "mathematics"], citedByCount: work.cited_by_count ?? 0, publishedAt: work.publication_date ? new Date(work.publication_date) : undefined, landingUrl: work.primary_location?.landing_page_url ?? undefined, openAccessUrl: work.open_access?.oa_url ?? work.primary_location?.pdf_url ?? undefined, rawMetadata: { episodeId, source: "OpenAlex", relevance: "Retrieved by semantic query over the research target." }, updatedAt: now }, $setOnInsert: { createdAt: now } }, { upsert: true });
-      await addGraphNode(episodeId, paperId, "PAPER", `Literature ${paperIds.length}`, work.title ?? "Untitled paper", 12 + paperIds.length * 15, 63, "candidate");
+      const existingPaper = await collections.papers.findOne({ _id: paperId });
+      const existingPaperMetadata = metadata(existingPaper?.rawMetadata);
+      const existingPaperEpisodeIds = Array.isArray(existingPaperMetadata.episodeIds) ? existingPaperMetadata.episodeIds.filter((value): value is string => typeof value === "string") : [];
+      const paperEpisodeIds = Array.from(new Set([...existingPaperEpisodeIds, typeof existingPaperMetadata.episodeId === "string" ? existingPaperMetadata.episodeId : undefined, episodeId].filter((value): value is string => Boolean(value))));
+      await collections.papers.updateOne({ _id: paperId }, { $set: { externalId: work.id, title: work.title ?? "Untitled paper", abstract: abstractFromIndex(work.abstract_inverted_index) ?? undefined, authors: (work.authorships ?? []).map((author) => author.author?.display_name ?? "").filter(Boolean), subjects: [episode.area ?? "mathematics"], citedByCount: work.cited_by_count ?? 0, publishedAt: work.publication_date ? new Date(work.publication_date) : undefined, landingUrl: work.primary_location?.landing_page_url ?? undefined, openAccessUrl: work.open_access?.oa_url ?? work.primary_location?.pdf_url ?? undefined, rawMetadata: { ...existingPaperMetadata, episodeId, episodeIds: paperEpisodeIds, source: "OpenAlex", discovery: work.discovery, matchedQuery: work.matchedQuery, relevance: "Retrieved from the seed or expanded literature search for this research space." }, updatedAt: now }, $setOnInsert: { createdAt: now } }, { upsert: true });
+      await addGraphNode(episodeId, paperId, "PAPER", `${work.discovery === "seed" ? "Seed" : "Expanded"} paper ${index + 1}`, work.title ?? "Untitled paper", 8 + (index % 8) * 12, 42 + Math.floor(index / 8) * 18, "candidate");
+      await addGraphEdge(episodeId, problem._id, paperId, "SUPPORTS", work.discovery === "seed" ? "seed literature" : "expanded related literature");
     }
     await emit(episodeId, "research.literature.completed", { count: works.length });
 

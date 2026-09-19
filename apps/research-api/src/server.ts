@@ -32,14 +32,14 @@ function metadataOf(value: unknown): Record<string, unknown> {
 }
 
 async function emit(episodeId: string, type: string, payload: Record<string, unknown>): Promise<void> {
-  const database = await getDatabase();
-  const events = database.collection<{ _id: string; episodeId: string; type: string; payload: Record<string, unknown>; createdAt: Date }>("research_events");
-  await events.insertOne({
+  const collections = await getCollections();
+  await collections.researchEvents.insertOne({
     _id: id("event"),
     episodeId,
     type,
     payload,
     createdAt: new Date(),
+    updatedAt: new Date(),
   });
 }
 
@@ -48,15 +48,16 @@ async function serializeJob(episodeId: string) {
   const episode = await collections.researchEpisodes.findOne({ _id: episodeId });
   if (!episode) return null;
 
-  const [problem, hypotheses, attempts, results, papers, formalization, graphNodes, graphEdges] = await Promise.all([
+  const [problem, hypotheses, attempts, results, papers, formalization, graphNodes, graphEdges, events] = await Promise.all([
     collections.researchProblems.findOne({ episodeId }),
     collections.researchHypotheses.find({ episodeId }).sort({ createdAt: 1 }).toArray(),
     collections.researchAttempts.find({ episodeId }).sort({ createdAt: 1 }).toArray(),
     collections.researchResults.find({ episodeId }).sort({ createdAt: 1 }).toArray(),
-    collections.papers.find({ "rawMetadata.episodeId": episodeId }).sort({ createdAt: 1 }).toArray(),
+    collections.papers.find({ $or: [{ "rawMetadata.episodeId": episodeId }, { "rawMetadata.episodeIds": episodeId }] }).sort({ createdAt: 1 }).toArray(),
     collections.formalizations.findOne({ episodeId }),
-    collections.graphNodes.find({ "metadata.episodeId": episodeId }).sort({ createdAt: 1 }).toArray(),
-    collections.graphRelationships.find({ "metadata.episodeId": episodeId }).sort({ createdAt: 1 }).toArray(),
+    collections.graphNodes.find({ $or: [{ "metadata.episodeId": episodeId }, { "metadata.episodeIds": episodeId }] }).sort({ createdAt: 1 }).toArray(),
+    collections.graphRelationships.find({ $or: [{ "metadata.episodeId": episodeId }, { "metadata.episodeIds": episodeId }] }).sort({ createdAt: 1 }).toArray(),
+    collections.researchEvents.find({ episodeId }).sort({ createdAt: 1 }).toArray(),
   ]);
 
   const graph = graphNodes.map((node) => {
@@ -84,9 +85,21 @@ async function serializeJob(episodeId: string) {
 
   return {
     id: episode._id,
+    projectId: episode.projectId,
+    problemId: problem?._id,
     title: episode.title,
     statement: problem?.statement ?? episode.objective,
+    researchSpace: {
+      name: episode.title,
+      statement: problem?.statement ?? episode.objective,
+      assumptions: problem?.assumptions ?? "",
+    },
     area: episode.area ?? "Mathematics",
+    configuration: {
+      provider: episode.modelProvider ?? "openai",
+      mode: episode.mode ?? "Diverse portfolio",
+      budget: episode.budget ?? 0,
+    },
     mode: episode.mode ?? "Diverse portfolio",
     provider: episode.modelProvider ?? "openai",
     budget: episode.budget ?? 0,
@@ -113,6 +126,8 @@ async function serializeJob(episodeId: string) {
         year: String(paper.publishedAt?.getFullYear() ?? "n.d."),
         summary: paper.abstract ?? "No abstract was available for this source.",
         relevance: String(metadata.relevance ?? "Retrieved for the current research target."),
+        discovery: String(metadata.discovery ?? "seed"),
+        matchedQuery: String(metadata.matchedQuery ?? ""),
         url: paper.landingUrl ?? paper.openAccessUrl ?? "#",
       };
     }),
@@ -132,7 +147,8 @@ async function serializeJob(episodeId: string) {
       result: attempt.proofState ?? attempt.error ?? "Attempt recorded.",
     })),
     proof,
-    results: results.map((result) => ({ id: result._id, title: result.title, summary: result.summary, status: result.status })),
+    results: results.map((result) => ({ id: result._id, hypothesisId: result.hypothesisId, attemptId: result.attemptId, title: result.title, summary: result.summary, status: result.status, evidence: result.evidence })),
+    events: events.map((event) => ({ id: event._id, type: event.type, payload: event.payload, createdAt: event.createdAt.toISOString() })),
   };
 }
 
@@ -159,14 +175,18 @@ app.post("/research/jobs", async (request: FastifyRequest<{ Body: CreateJobBody 
   const episodeId = id("episode");
   const problemId = id("problem");
   const collections = await getCollections();
+  const area = body.area?.trim() || "Mathematics";
+  const provider = body.provider?.trim() || "openai";
+  const mode = body.mode?.trim() || "Diverse portfolio";
+  const budget = Math.max(1, Math.min(30, Number(body.budget ?? 6)));
   await collections.researchProjects.insertOne({ _id: projectId, name: title, description: statement, status: "ACTIVE", createdAt: now, updatedAt: now });
-  await collections.researchEpisodes.insertOne({ _id: episodeId, projectId, title, objective: statement, status: "ACTIVE", area: body.area ?? "Mathematics", modelProvider: body.provider ?? "openai", mode: body.mode ?? "Diverse portfolio", budget: Math.max(1, Math.min(30, Number(body.budget ?? 6))), stage: "Queued for research worker", progress: 2, createdAt: now, updatedAt: now });
+  await collections.researchEpisodes.insertOne({ _id: episodeId, projectId, title, objective: statement, status: "ACTIVE", area, modelProvider: provider, mode, budget, stage: "Queued for research worker", progress: 2, createdAt: now, updatedAt: now });
   await collections.researchProblems.insertOne({ _id: problemId, episodeId, title, statement, assumptions: "", status: "ACTIVE", createdAt: now, updatedAt: now });
 
   try {
     if (redis.status === "wait") await redis.connect();
     await redis.lpush("triviality:research:jobs", JSON.stringify({ episodeId }));
-    await emit(episodeId, "research.job.created", { title, area: body.area ?? "Mathematics" });
+    await emit(episodeId, "research.job.created", { projectId, episodeId, problemId, title, statement, area, provider, mode, budget });
   } catch (error) {
     await collections.researchEpisodes.updateOne({ _id: episodeId }, { $set: { status: "ABANDONED", stage: "Queue unavailable", error: error instanceof Error ? error.message : "Redis unavailable", updatedAt: new Date() } });
     return reply.code(503).send({ error: "Research queue unavailable. Start Redis and retry." });
@@ -187,8 +207,8 @@ app.get("/research/jobs/:jobId", async (request: FastifyRequest<{ Params: { jobI
 });
 
 app.get("/research/jobs/:jobId/events", async (request: FastifyRequest<{ Params: { jobId: string } }>) => {
-  const database = await getDatabase();
-  return database.collection("research_events").find({ episodeId: request.params.jobId }).sort({ createdAt: 1 }).toArray();
+  const collections = await getCollections();
+  return collections.researchEvents.find({ episodeId: request.params.jobId }).sort({ createdAt: 1 }).toArray();
 });
 
 app.addHook("onClose", async () => {
