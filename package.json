@@ -11,7 +11,9 @@
     "db:status": "docker compose ps",
     "db:ensure-indexes": "pnpm --filter @triviality/database ensure-indexes",
     "papers:ingest": "pnpm --filter @triviality/paper-ingest ingest",
-    "papers:api": "pnpm --filter @triviality/api-papers dev"
+    "papers:api": "pnpm --filter @triviality/api-papers dev",
+    "research:api": "pnpm --filter @triviality/research-api dev",
+    "research:worker": "pnpm --filter @triviality/research-worker dev"
   },
   "devDependencies": {
     "turbo": "^2.5.0"

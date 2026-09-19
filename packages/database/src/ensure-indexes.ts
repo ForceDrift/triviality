@@ -1,8 +1,15 @@
-import { getCollections, getDatabase } from "./client.js";
+import { getCollections, getDatabase, getMongoClient } from "./client.js";
 
 export async function ensureIndexes(): Promise<void> {
   const collections = await getCollections();
   await Promise.all([
+    collections.researchEpisodes.createIndex({ projectId: 1, createdAt: -1 }),
+    collections.researchProblems.createIndex({ episodeId: 1 }),
+    collections.researchHypotheses.createIndex({ episodeId: 1, createdAt: 1 }),
+    collections.researchAttempts.createIndex({ episodeId: 1, createdAt: 1 }),
+    collections.researchResults.createIndex({ episodeId: 1, createdAt: 1 }),
+    collections.formalizations.createIndex({ episodeId: 1 }),
+    collections.papers.createIndex({ "rawMetadata.episodeId": 1, createdAt: 1 }),
     collections.papers.createIndex({ externalId: 1 }, { unique: true }),
     collections.sources.createIndex({ provider: 1, externalId: 1 }, { unique: true }),
     collections.paperSources.createIndex({ paperId: 1, sourceId: 1 }, { unique: true }),
@@ -17,6 +24,7 @@ export async function ensureIndexes(): Promise<void> {
 
   try {
     const db = await getDatabase();
+    await db.collection("research_events").createIndex({ episodeId: 1, createdAt: 1 });
     await db.collection("paper_embeddings").createSearchIndex({
       name: "paper_embedding_vector",
       type: "vectorSearch",
@@ -43,4 +51,5 @@ export async function ensureIndexes(): Promise<void> {
 if (process.argv[1]?.endsWith("ensure-indexes.ts")) {
   await ensureIndexes();
   console.log("MongoDB indexes ensured");
+  await (await getMongoClient()).close();
 }

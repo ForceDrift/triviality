@@ -25,7 +25,21 @@ export interface BaseDocument {
 }
 
 export interface ResearchProjectDocument extends BaseDocument { name: string; description?: string; status: ResearchStatus; }
-export interface ResearchEpisodeDocument extends BaseDocument { projectId: string; title: string; objective: string; status: ResearchStatus; }
+export interface ResearchEpisodeDocument extends BaseDocument {
+  projectId: string;
+  title: string;
+  objective: string;
+  status: ResearchStatus;
+  area?: string;
+  modelProvider?: string;
+  mode?: string;
+  budget?: number;
+  stage?: string;
+  progress?: number;
+  summary?: string;
+  error?: string;
+  completedAt?: Date;
+}
 export interface ResearchProblemDocument extends BaseDocument { episodeId: string; title: string; statement: string; assumptions?: unknown; status: ResearchStatus; }
 export interface ResearchHypothesisDocument extends BaseDocument { episodeId: string; problemId?: string; statement: string; rationale: string; assumptions?: unknown; expectedConsequences?: unknown; noveltyEstimate?: number; plausibilityEstimate?: number; formalizability?: number; status: ResearchStatus; }
 export interface ResearchAttemptDocument extends BaseDocument { episodeId: string; hypothesisId: string; proofStrategyId?: string; strategy: string; status: AttemptStatus; input?: unknown; proofState?: string; error?: string; startedAt?: Date; completedAt?: Date; }
@@ -41,7 +55,23 @@ export interface ProofStrategyDocument extends BaseDocument { techniqueId?: stri
 export interface MathematicalStructureDocument extends BaseDocument { name: string; description: string; axioms?: unknown; }
 export interface CounterexampleDocument extends BaseDocument { failureId?: string; statement: string; construction?: unknown; source?: string; }
 export interface FailureDocument extends BaseDocument { attemptId?: string; kind: string; message: string; lesson?: string; violatedAssumption?: string; }
-export interface FormalizationDocument extends BaseDocument { attemptId?: string; theoremId?: string; lemmaId?: string; system: string; systemVersion?: string; sourceArtifactId?: string; verified: boolean; verificationLog?: string; }
+export interface FormalizationDocument extends BaseDocument {
+  episodeId?: string;
+  attemptId?: string;
+  theoremId?: string;
+  lemmaId?: string;
+  system: string;
+  systemVersion?: string;
+  sourceArtifactId?: string;
+  verified: boolean;
+  verificationLog?: string;
+  theoremName?: string;
+  statement?: string;
+  leanSource?: string;
+  latexSource?: string;
+  checker?: string;
+  axioms?: string[];
+}
 
 export interface SourceDocument extends BaseDocument { provider: SourceProvider; externalId: string; canonicalUrl: string; metadata?: unknown; }
 export interface PaperSourceDocument extends BaseDocument { paperId: string; sourceId: string; rank?: number; retrievedAt: Date; }

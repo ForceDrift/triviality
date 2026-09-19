@@ -18,15 +18,15 @@ import {
 
 const links = [
   { label: "Overview", href: "/dashboard", icon: <IconHome2 size={20} /> },
-  { label: "Research graph", href: "/dashboard", icon: <IconGraph size={20} /> },
-  { label: "Literature", href: "/dashboard", icon: <IconBook2 size={20} /> },
-  { label: "New episode", href: "/dashboard", icon: <IconPlus size={20} /> },
+  { label: "Research graph", href: "/dashboard/graph", icon: <IconGraph size={20} /> },
+  { label: "Literature", href: "/dashboard/literature", icon: <IconBook2 size={20} /> },
+  { label: "Research", href: "/dashboard#new-episode", icon: <IconPlus size={20} /> },
 ];
 
 export function DashboardSidebar() {
   return (
     <Sidebar>
-      <SidebarBody className="overflow-hidden border-r border-black/10 !bg-white text-[#111]">
+      <SidebarBody className="overflow-hidden border-r border-black/10 !bg-[#f5f5f5] text-[#111] md:sticky md:top-0 md:!min-h-screen md:!h-screen">
         <div className="flex flex-1 flex-col gap-10">
           <DashboardBrand />
           <div className="flex flex-col gap-3">

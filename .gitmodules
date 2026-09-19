@@ -1,0 +1,3 @@
+[submodule "external/norththehackers"]
+	path = external/norththehackers
+	url = https://github.com/sharonbasovich/norththehackers.git
