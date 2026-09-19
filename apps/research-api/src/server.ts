@@ -3,15 +3,18 @@ import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyRequest } from "fastify";
 import { Redis } from "ioredis";
 import { getCollections, getDatabase, getMongoClient } from "@triviality/database";
+import { catalog, validateRoleModels } from "./models.js";
 import { config } from "./config.js";
 
 type CreateJobBody = {
   title?: string;
   statement?: string;
   area?: string;
-  provider?: string;
+  roleModels?: unknown;
+  provider?: string; // Compatibility with the frontend before per-role selection.
   mode?: string;
   budget?: number;
+  leanStatement?: string;
 };
 
 const app = Fastify({ logger: true });
@@ -95,14 +98,19 @@ async function serializeJob(episodeId: string) {
       assumptions: problem?.assumptions ?? "",
     },
     area: episode.area ?? "Mathematics",
+    orchestrator: episode.orchestrator,
+    roleModels: episode.roleModels,
     configuration: {
-      provider: episode.modelProvider ?? "openai",
+      orchestrator: episode.orchestrator,
+      roleModels: episode.roleModels,
+      provider: episode.modelProvider ?? (episode.orchestrator ? undefined : "openai"),
       mode: episode.mode ?? "Diverse portfolio",
       budget: episode.budget ?? 0,
     },
     mode: episode.mode ?? "Diverse portfolio",
-    provider: episode.modelProvider ?? "openai",
+    provider: episode.modelProvider ?? (episode.orchestrator ? undefined : "openai"),
     budget: episode.budget ?? 0,
+    leanStatement: episode.leanStatement,
     status: publicStatus(episode.status),
     stage: episode.stage ?? "Research queued",
     progress: episode.progress ?? 0,
@@ -137,7 +145,7 @@ async function serializeJob(episodeId: string) {
       statement: hypothesis.statement,
       approach: String((hypothesis.expectedConsequences as { approach?: string } | undefined)?.approach ?? "Candidate direction"),
       status: hypothesis.status === "DISPROVED" ? "disproved" : hypothesis.status === "PROMISING" ? "promising" : "candidate",
-      score: hypothesis.plausibilityEstimate ?? 0,
+      score: hypothesis.plausibilityEstimate,
     })),
     attempts: attempts.map((attempt) => ({
       id: attempt._id,
@@ -174,19 +182,29 @@ app.post("/research/jobs", async (request: FastifyRequest<{ Body: CreateJobBody 
   const projectId = id("project");
   const episodeId = id("episode");
   const problemId = id("problem");
-  const collections = await getCollections();
   const area = body.area?.trim() || "Mathematics";
-  const provider = body.provider?.trim() || "openai";
+  let roleModels: Record<string, string>;
+  try {
+    // The integration branch also serves the older single-provider frontend.
+    const selections = body.roleModels === undefined
+      ? Object.fromEntries(catalog.roles.map((role) => [role.id, body.provider === "devin" ? "devin/agent" : catalog.defaultModel]))
+      : body.roleModels;
+    roleModels = validateRoleModels(selections);
+  }
+  catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
   const mode = body.mode?.trim() || "Diverse portfolio";
-  const budget = Math.max(1, Math.min(30, Number(body.budget ?? 6)));
+  const budget = Math.max(1, Math.min(6, Number(body.budget ?? 2)));
+  if (!Number.isFinite(budget) || !Number.isInteger(budget)) return reply.code(400).send({ error: "budget must be an integer" });
+  if (body.leanStatement !== undefined && (typeof body.leanStatement !== "string" || body.leanStatement.length > 6000)) return reply.code(400).send({ error: "leanStatement must be a string of at most 6000 characters" });
+  const collections = await getCollections();
   await collections.researchProjects.insertOne({ _id: projectId, name: title, description: statement, status: "ACTIVE", createdAt: now, updatedAt: now });
-  await collections.researchEpisodes.insertOne({ _id: episodeId, projectId, title, objective: statement, status: "ACTIVE", area, modelProvider: provider, mode, budget, stage: "Queued for research worker", progress: 2, createdAt: now, updatedAt: now });
+  await collections.researchEpisodes.insertOne({ _id: episodeId, projectId, title, objective: statement, status: "ACTIVE", area, orchestrator: "workswarm", roleModels, mode, budget, leanStatement: body.leanStatement?.trim() || undefined, stage: "Queued for research worker", progress: 2, createdAt: now, updatedAt: now });
   await collections.researchProblems.insertOne({ _id: problemId, episodeId, title, statement, assumptions: "", status: "ACTIVE", createdAt: now, updatedAt: now });
 
   try {
     if (redis.status === "wait") await redis.connect();
     await redis.lpush("triviality:research:jobs", JSON.stringify({ episodeId }));
-    await emit(episodeId, "research.job.created", { projectId, episodeId, problemId, title, statement, area, provider, mode, budget });
+    await emit(episodeId, "research.job.created", { projectId, episodeId, problemId, title, statement, area, orchestrator: "workswarm", roleModels, mode, budget });
   } catch (error) {
     await collections.researchEpisodes.updateOne({ _id: episodeId }, { $set: { status: "ABANDONED", stage: "Queue unavailable", error: error instanceof Error ? error.message : "Redis unavailable", updatedAt: new Date() } });
     return reply.code(503).send({ error: "Research queue unavailable. Start Redis and retry." });

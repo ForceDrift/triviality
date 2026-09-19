@@ -32,8 +32,11 @@ export interface ResearchEpisodeDocument extends BaseDocument {
   status: ResearchStatus;
   area?: string;
   modelProvider?: string;
+  orchestrator?: "workswarm";
+  roleModels?: Record<string, string>;
   mode?: string;
   budget?: number;
+  leanStatement?: string;
   stage?: string;
   progress?: number;
   summary?: string;
