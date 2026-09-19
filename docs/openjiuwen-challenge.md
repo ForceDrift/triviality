@@ -93,7 +93,7 @@ usage; Devin instead reports ACU usage.
 Install **Lean 4.19.0** through elan or the official binary release. Set
 `SWARM_LEAN_BIN` to the absolute path of `lean`/`lean.exe`. Windows binaries
 placed in `.data/lean/lean-4.19.0-windows/bin/lean.exe` are detected automatically.
-The demo uses `Std` and needs neither Mathlib nor the external submodule.
+The demo uses `Std` and does not require the imported backend's Mathlib project.
 
 ## Standalone live demo
 
