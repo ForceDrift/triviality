@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { IconArrowUpRight, IconCheck, IconChevronDown, IconChevronRight, IconChevronUp, IconLayoutGrid, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
+import { IconArrowUpRight, IconCheck, IconChevronDown, IconChevronRight, IconChevronUp, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
 import { motion } from "motion/react";
 import { DashboardSidebar } from "./dashboard-sidebar";
 import { DashboardTopbar } from "./dashboard-topbar";
@@ -14,7 +14,6 @@ const providers: Array<{ id: ResearchProvider; name: string; description: string
   { id: "openai", name: "OpenAI", description: "Hypotheses, synthesis, and formalization.", logo: "https://models.dev/logos/openai.svg" },
   { id: "devin", name: "Devin", description: "Autonomous research agents and critique.", logo: "https://devin.ai/favicon.ico" },
   { id: "huawei", name: "Huawei", description: "Huawei model and infrastructure research route.", logo: "https://www.huawei.com/favicon.ico" },
-  { id: "baseten", name: "Baseten", description: "Production inference and model deployment.", logo: "https://www.baseten.co/favicon.ico" },
 ];
 
 type ResearchForm = {
@@ -164,23 +163,12 @@ function ResearchDeployModal({
               <IconChevronUp size={19} />
             </div>
 
-            <div className="mt-4 flex items-center justify-between gap-4 rounded-md border border-black bg-[#fafafa] px-4 py-3">
-              <div className="min-w-0">
-                <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/45">Research workload</p>
-                <p className="mt-1 text-base font-medium tracking-[-0.03em]">Math Annotator</p>
-                <p className="mt-0.5 truncate text-xs text-black/50">Explore mathematical spaces, annotate literature, and generate candidate ideas.</p>
-              </div>
-              <span className="shrink-0 rounded-md bg-black px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white">Selected</span>
-            </div>
-
             <div className="mt-4 flex flex-col gap-2.5 lg:flex-row">
               <label className="relative min-w-0 flex-1">
                 <span className="sr-only">Search model providers</span>
                 <IconSearch className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-black/70" size={18} />
                 <input className="h-11 w-full rounded-md border border-black/12 bg-white pl-10 pr-4 text-sm outline-none placeholder:text-black/35 focus:border-black/35" placeholder="Search model providers" value={providerQuery} onChange={(event) => setProviderQuery(event.target.value)} />
               </label>
-              <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-violet-200 px-4 text-sm font-medium transition hover:bg-violet-50" type="button"><IconLayoutGrid size={18} /> Explore all</button>
-              <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-violet-200 px-4 text-sm font-medium transition hover:bg-violet-50" type="button"><IconPlus size={18} /> Create new</button>
             </div>
 
             <div className="mt-4 grid gap-2">
